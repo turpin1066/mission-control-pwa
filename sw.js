@@ -4,12 +4,13 @@ const CACHE_NAME = "mc-shell-v3";
 
 // Optional: add whatever core files you want pre-cached
 const SHELL_URLS = [
-  "/",                    // root
-  "/mission-control.html",
-  "/manifest.webmanifest",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png"
+  "./",                  // root -> index.html
+  "./index.html",
+  "./manifest.webmanifest",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png"
 ];
+
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
