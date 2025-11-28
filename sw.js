@@ -48,6 +48,18 @@ self.addEventListener("fetch", (event) => {
   // Only handle GET
   if (request.method !== "GET") return;
 
+  const url = new URL(request.url);
+
+  // Ignore non-HTTP(S) schemes (chrome-extension, file, etc.)
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return;
+  }
+
+  // Optional but recommended: only cache same-origin files (your own app shell)
+  if (url.origin !== self.location.origin) {
+    return; // let the browser handle external APIs/feeds normally
+  }
+
   // Let audio files go straight to the network, no caching
   if (request.destination === "audio") {
     return; // browser does a normal fetch, SW doesn't intercept
@@ -81,7 +93,7 @@ self.addEventListener("fetch", (event) => {
       } catch (err) {
         console.warn("[MC][SW] fetch failed:", err);
 
-        // Last resort: generic offline response, but still a valid Response
+        // Last resort: generic offline response
         return new Response("Offline", {
           status: 503,
           statusText: "Offline",
