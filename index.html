@@ -3324,10 +3324,28 @@ if (ambientToggle && ambientHum){
   const PROXY_BASE = 'https://mission-control-rss-proxy.onrender.com/rss?url=';
 
   const FEED_RSS = {
-    spacex:   PROXY_BASE + encodeURIComponent('https://www.reddit.com/r/spacex/.rss'),
-    elon:     PROXY_BASE + encodeURIComponent('https://www.reddit.com/r/elonmusk/.rss'),
-    launches: PROXY_BASE + encodeURIComponent('https://www.reddit.com/r/rocketlaunches/.rss')
-  };
+  // SpaceX – Teslarati + NASAspaceflight + SpaceNews, no Reddit, no Ars
+  spacex: PROXY_BASE + encodeURIComponent(
+    'https://news.google.com/rss/search?' +
+    'q=SpaceX%20(site:teslarati.com%20OR%20site:nasaspaceflight.com%20OR%20site:spacenews.com)' +
+    '&hl=en-US&gl=US&ceid=US:en'
+  ),
+
+  // Elon Musk – general news, keyword-filtered
+  elon: PROXY_BASE + encodeURIComponent(
+    'https://news.google.com/rss/search?' +
+    'q=%22Elon%20Musk%22&hl=en-US&gl=US&ceid=US:en'
+  ),
+
+  // Launch notices – launch-focused stories from Spaceflight Now + NASAspaceflight
+  launches: PROXY_BASE + encodeURIComponent(
+    'https://news.google.com/rss/search?' +
+    'q=(launch%20OR%20%22launch%20schedule%22%20OR%20%22Falcon%209%20launch%22%20OR%20Starship)' +
+    '%20(site:spaceflightnow.com%20OR%20site:nasaspaceflight.com)' +
+    '&hl=en-US&gl=US&ceid=US:en'
+  )
+};
+
 
   const FEED_LABEL = {
     spacex:   'SpaceX',
