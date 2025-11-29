@@ -3293,11 +3293,13 @@ if (ambientToggle && ambientHum){
 <!-- Mission Social Feed (RSS tabs, via local proxy + cache + blocklist) -->
 <script>
 (function () {
-  // Direct HTTPS RSS feeds (no local proxy needed on Render)
+  // RSS proxy hosted on Render
+  const PROXY_BASE = 'https://mission-control-rss-proxy.onrender.com/rss?url=';
+
   const FEED_RSS = {
-    spacex:   'https://www.reddit.com/r/spacex/.rss',
-    elon:     'https://www.reddit.com/r/elonmusk/.rss',
-    launches: 'https://www.reddit.com/r/rocketlaunches/.rss'
+    spacex:   PROXY_BASE + encodeURIComponent('https://www.reddit.com/r/spacex/.rss'),
+    elon:     PROXY_BASE + encodeURIComponent('https://www.reddit.com/r/elonmusk/.rss'),
+    launches: PROXY_BASE + encodeURIComponent('https://www.reddit.com/r/rocketlaunches/.rss')
   };
 
   const FEED_LABEL = {
@@ -3310,6 +3312,7 @@ if (ambientToggle && ambientHum){
   const FEED_CACHE_TTL = 10 * 60 * 1000;  // 10 minutes in-mem + persistent cache
   const FEED_STALE_MS  = 60 * 60 * 1000;  // 1 hour = stale
   const FEED_BLOCK_KEY = 'feed.blocklist'; // MC storage key used by the drawer UI
+
 
 
   function niceDate(raw) {
