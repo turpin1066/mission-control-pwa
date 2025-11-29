@@ -3290,7 +3290,6 @@ if (ambientToggle && ambientHum){
   }
 })();
 </script>
-<!-- Mission Social Feed (RSS tabs, via local proxy + cache + blocklist) -->
 <!-- Mission Social Feed (RSS tabs, via Render proxy + cache + blocklist) -->
 <script>
 (function () {
@@ -3363,6 +3362,22 @@ if (ambientToggle && ambientHum){
       return !needles.some(n => hay.includes(n));
     });
   }
+    function cleanSummary(summary) {
+    if (!summary) return '';
+    let s = summary;
+
+    // Drop Reddit's SC_OFF / SC_ON comments
+    s = s.replace(/<!--[\s\S]*?-->/g, ' ');
+
+    // Strip any remaining HTML tags
+    s = s.replace(/<[^>]+>/g, ' ');
+
+    // Normalize whitespace
+    s = s.replace(/\s+/g, ' ').trim();
+
+    return s;
+  }
+
 
   // --- Parse Reddit Atom feed --------------------------------------------
 
@@ -3510,7 +3525,9 @@ if (ambientToggle && ambientHum){
 
       const body = document.createElement('p');
       body.className = 'feed-body';
-      body.textContent = (item.summary || '').replace(/\s+/g, ' ').trim().slice(0, 280) + '…';
+      const text = cleanSummary(item.summary || '');
+      body.textContent = text.slice(0, 280) + (text.length > 280 ? '…' : '');
+
 
       article.appendChild(header);
       article.appendChild(titleLink);
