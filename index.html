@@ -3576,74 +3576,75 @@ if (ambientToggle && ambientHum){
     // Optional: leave existing skeleton markup alone.
     // If you want, you could inject lightweight placeholders here.
   }
+function renderItems(feedKey, payload) {
+  const { updated, items } = payload; // you can leave `updated` there or remove it
+  const filtered = applyBlocklist(items, blocklist).slice(0, MAX_ITEMS);
 
-  function renderItems(feedKey, payload) {
-    const { updated, items } = payload;
-    const filtered = applyBlocklist(items, blocklist).slice(0, MAX_ITEMS);
+  listEl.innerHTML = '';
 
-    listEl.innerHTML = '';
+  if (!filtered.length) {
+    const empty = document.createElement('div');
+    empty.className = 'feed-empty';
+    empty.textContent = `Unable to load ${FEED_LABEL[feedKey] || 'feed'} right now.`;
+    listEl.appendChild(empty);
 
-    if (!filtered.length) {
-      const empty = document.createElement('div');
-      empty.className = 'feed-empty';
-      empty.textContent = `Unable to load ${FEED_LABEL[feedKey] || 'feed'} right now.`;
-      listEl.appendChild(empty);
-      setUpdatedLabel(updated ? new Date(updated).getTime() : null);
-      return;
+    // Show "last checked" as now, even if feed is empty
+    setUpdatedLabel(Date.now());
+    return;
+  }
+
+  filtered.forEach(item => {
+    const article = document.createElement('article');
+    article.className = 'feed-item';
+
+    const header = document.createElement('div');
+    header.className = 'feed-header';
+
+    const pill = document.createElement('span');
+    pill.className = 'feed-pill';
+    pill.textContent = FEED_LABEL[feedKey] || 'Feed';
+
+    const time = document.createElement('span');
+    time.className = 'feed-time';
+    time.textContent = item.date ? niceDate(item.date) : '';
+
+    header.appendChild(pill);
+    header.appendChild(time);
+
+    const titleLink = document.createElement('a');
+    titleLink.className = 'feed-title';
+    titleLink.href = item.url || '#';
+    titleLink.target = '_blank';
+    titleLink.rel = 'noopener noreferrer';
+    titleLink.textContent = item.title || '(no title)';
+
+    const meta = document.createElement('p');
+    meta.className = 'feed-body';
+    const source  = getSource(item);
+    const dateStr = item.date ? niceDate(item.date) : '';
+
+    if (source && dateStr) {
+      meta.textContent = `${source} — ${dateStr}`;
+    } else if (source) {
+      meta.textContent = source;
+    } else if (dateStr) {
+      meta.textContent = dateStr;
+    } else {
+      meta.textContent = '';
     }
 
-    filtered.forEach(item => {
-      const article = document.createElement('article');
-      article.className = 'feed-item';
+    article.appendChild(header);
+    article.appendChild(titleLink);
+    if (meta.textContent) {
+      article.appendChild(meta);
+    }
 
-      const header = document.createElement('div');
-      header.className = 'feed-header';
+    listEl.appendChild(article);
+  });
 
-      const pill = document.createElement('span');
-      pill.className = 'feed-pill';
-      pill.textContent = FEED_LABEL[feedKey] || 'Feed';
-
-      const time = document.createElement('span');
-      time.className = 'feed-time';
-      time.textContent = item.date ? niceDate(item.date) : '';
-
-      header.appendChild(pill);
-      header.appendChild(time);
-
-      const titleLink = document.createElement('a');
-      titleLink.className = 'feed-title';
-      titleLink.href = item.url || '#';
-      titleLink.target = '_blank';
-      titleLink.rel = 'noopener noreferrer';
-      titleLink.textContent = item.title || '(no title)';
-
-      const meta = document.createElement('p');
-      meta.className = 'feed-body';
-      const source  = getSource(item);
-      const dateStr = item.date ? niceDate(item.date) : '';
-
-      if (source && dateStr) {
-        meta.textContent = `${source} — ${dateStr}`;
-      } else if (source) {
-        meta.textContent = source;
-      } else if (dateStr) {
-        meta.textContent = dateStr;
-      } else {
-        meta.textContent = '';
-      }
-
-      article.appendChild(header);
-      article.appendChild(titleLink);
-      if (meta.textContent) {
-        article.appendChild(meta);
-      }
-
-      listEl.appendChild(article);
-    });
-
-    const ts = updated ? new Date(updated).getTime() : Date.now();
-    setUpdatedLabel(ts);
-  }
+  // "Last updated" = when Mission Control fetched, not feed's own timestamp
+  setUpdatedLabel(Date.now());
+}
 
   async function fetchFeed(feedKey, { force } = {}) {
     try {
