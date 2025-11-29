@@ -3291,9 +3291,11 @@ if (ambientToggle && ambientHum){
 })();
 </script>
 <!-- Mission Social Feed (RSS tabs, via local proxy + cache + blocklist) -->
+<!-- Mission Social Feed (RSS tabs, via Render proxy + cache + blocklist) -->
 <script>
 (function () {
-  // RSS proxy hosted on Render
+  // --- Config -------------------------------------------------------------
+
   const PROXY_BASE = 'https://mission-control-rss-proxy.onrender.com/rss?url=';
 
   const FEED_RSS = {
@@ -3309,11 +3311,11 @@ if (ambientToggle && ambientHum){
   };
 
   const MAX_ITEMS      = 8;
-  const FEED_CACHE_TTL = 10 * 60 * 1000;  // 10 minutes in-mem + persistent cache
-  const FEED_STALE_MS  = 60 * 60 * 1000;  // 1 hour = stale
-  const FEED_BLOCK_KEY = 'feed.blocklist'; // MC storage key used by the drawer UI
+  const FEED_CACHE_TTL = 10 * 60 * 1000;  // 10 minutes
+  const FEED_STALE_MS  = 60 * 60 * 1000;  // 1 hour
+  const FEED_BLOCK_KEY = 'feed.blocklist';
 
-
+  // --- Small helpers ------------------------------------------------------
 
   function niceDate(raw) {
     if (!raw) return '';
@@ -3328,340 +3330,333 @@ if (ambientToggle && ambientHum){
     });
   }
 
-  // --- Persistent cache helpers (MC-based) ---
-
-  function readPersistentFeed(key) {
-    try {
-      if (typeof MC === 'undefined' || typeof MC.get !== 'function') return null;
-      const stored = MC.get('feed.' + key, null);
-      if (!stored || !stored.ts || !Array.isArray(stored.items)) return null;
-      if (Date.now() - stored.ts > FEED_CACHE_TTL) return null;
-      return stored;
-    } catch (e) {
-      console.warn('[MissionFeed] readPersistentFeed failed', e);
-      return null;
-    }
+  function $(sel) {
+    return document.querySelector(sel);
   }
 
-  function writePersistentFeed(key, items) {
-    try {
-      if (typeof MC === 'undefined' || typeof MC.set !== 'function') return;
-      MC.set('feed.' + key, { ts: Date.now(), items });
-    } catch (e) {
-      console.warn('[MissionFeed] writePersistentFeed failed', e);
-    }
+  function $all(sel) {
+    return Array.from(document.querySelectorAll(sel));
   }
 
-  // Read just timestamp meta (even if older than FEED_CACHE_TTL)
-  function readFeedMeta(key) {
+  function readBlocklist() {
     try {
-      if (typeof MC === 'undefined' || typeof MC.get !== 'function') return null;
-      const stored = MC.get('feed.' + key, null);
-      if (!stored || !stored.ts) return null;
-      return { ts: stored.ts };
-    } catch (e) {
-      console.warn('[MissionFeed] readFeedMeta failed', e);
-      return null;
-    }
-  }
-
-  // --- Blocklist helpers (shared with the drawer UI script) ---
-
-  function getFeedBlocklist() {
-    try {
-      if (typeof MC === 'undefined' || typeof MC.get !== 'function') return [];
-      const raw = MC.get(FEED_BLOCK_KEY, []);
-      if (!Array.isArray(raw)) return [];
-      return raw
-        .map(x => String(x).trim().toLowerCase())
-        .filter(Boolean);
-    } catch (e) {
-      console.warn('[MissionFeed] getFeedBlocklist failed', e);
+      const raw = localStorage.getItem(FEED_BLOCK_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch {
       return [];
     }
   }
 
-  function applyFeedBlocklist(entries) {
-    const patterns = getFeedBlocklist();
-    if (!patterns.length) return entries;
+  function saveBlocklist(list) {
+    try {
+      localStorage.setItem(FEED_BLOCK_KEY, JSON.stringify(list));
+    } catch {}
+  }
 
-    return entries.filter(e => {
-      const haystack = (
-        (e.title || '') + ' ' +
-        (e.desc  || '') + ' ' +
-        (e.link  || '')
-      ).toLowerCase();
-
-      // hide entry if ANY pattern appears in title/desc/link
-      return !patterns.some(p => p && haystack.includes(p));
+  function applyBlocklist(items, blocklist) {
+    if (!blocklist || !blocklist.length) return items;
+    const needles = blocklist.map(s => s.toLowerCase());
+    return items.filter(item => {
+      const hay = (item.title + ' ' + item.summary).toLowerCase();
+      return !needles.some(n => hay.includes(n));
     });
   }
 
-  // --- Fetch / parse RSS ---
+  // --- Parse Reddit Atom feed --------------------------------------------
 
-  async function fetchFeed(key) {
-    const url = FEED_RSS[key];
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+  function parseAtom(xmlText) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'text/xml');
+    const feed = doc.querySelector('feed');
+    if (!feed) return { updated: null, items: [] };
 
-    const text = await res.text();
-    const doc  = new DOMParser().parseFromString(text, 'application/xml');
-    const items = Array.from(doc.querySelectorAll('item')).slice(0, MAX_ITEMS);
+    const updated =
+      feed.querySelector('updated')?.textContent ||
+      feed.querySelector('modified')?.textContent ||
+      null;
 
-    return items.map(item => ({
-      title: item.querySelector('title')?.textContent || '',
-      link:  item.querySelector('link')?.textContent  || '',
-      date:  item.querySelector('pubDate')?.textContent || '',
-      desc:  item.querySelector('description')?.textContent || ''
-    }));
+    const entries = Array.from(feed.getElementsByTagName('entry'));
+    const items = entries.map(entry => {
+      const title = entry.getElementsByTagName('title')[0]?.textContent || '(no title)';
+
+      // link rel="alternate" is the human link
+      let linkNode = Array.from(entry.getElementsByTagName('link'))
+        .find(l => l.getAttribute('rel') === 'alternate');
+      if (!linkNode) {
+        linkNode = entry.getElementsByTagName('link')[0] || null;
+      }
+      const url = linkNode ? linkNode.getAttribute('href') || '#' : '#';
+
+      const date =
+        entry.getElementsByTagName('updated')[0]?.textContent ||
+        entry.getElementsByTagName('published')[0]?.textContent ||
+        '';
+
+      const contentNode =
+        entry.getElementsByTagName('content')[0] ||
+        entry.getElementsByTagName('summary')[0] ||
+        null;
+      const summary = contentNode ? contentNode.textContent || '' : '';
+
+      return { title, url, date, summary };
+    });
+
+    return { updated, items };
   }
 
-  function renderFeed(container, key, entries) {
-  const visible = applyFeedBlocklist(entries);
+  // --- Cache --------------------------------------------------------------
 
-  if (!visible.length) {
-    container.innerHTML =
-      `<div class="mission-feed-empty">No posts found for ${FEED_LABEL[key]}${entries.length ? ' (filtered).' : '.'}</div>`;
-    container.dataset.hasContent = '0';
+  const memoryCache = {}; // feedKey -> { ts, updated, items }
+
+  function getCache(feedKey) {
+    const c = memoryCache[feedKey];
+    if (!c) return null;
+    if (Date.now() - c.ts > FEED_CACHE_TTL) return null;
+    return c;
+  }
+
+  function setCache(feedKey, payload) {
+    memoryCache[feedKey] = {
+      ts: Date.now(),
+      updated: payload.updated || null,
+      items: payload.items || []
+    };
+  }
+
+  // --- DOM wiring ---------------------------------------------------------
+
+  const listEl        = $('#missionFeedList');
+  const updatedLabel  = $('#feedUpdatedLabel');
+  const tabs          = $all('.mission-feed-tab');
+  const filterBtn     = $('#missionFeedFilter');
+  const refreshBtn    = $('#missionFeedRefresh');
+  const filterPanel   = $('#feedBlockPanel');
+  const blockInput    = $('#feedBlockInput');
+  const blockAddBtn   = $('#feedBlockAdd');
+  const blockClearBtn = $('#feedBlockClear');
+  const blockListEl   = $('#feedBlockList');
+
+  if (!listEl || !updatedLabel || !tabs.length) {
+    console.warn('[MissionFeed] missing DOM, aborting');
     return;
   }
 
-  // LIMIT TO 4 ITEMS
-  const visibleLimited = visible.slice(0, 4);
+  let currentFeed = 'spacex';
+  let blocklist   = readBlocklist();
 
-  const html = visibleLimited.map(e => {
-    const date = niceDate(e.date);
-    const rawDesc = e.desc || '';
-    const stripped = rawDesc
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    const body = stripped.length > 260 ? stripped.slice(0, 260) + '…' : stripped;
-
-    return `
-      <article class="mission-feed-item">
-        <div class="mission-feed-item-header">
-          <div class="mission-feed-item-title">${e.title || '(no title)'}</div>
-          <div class="mission-feed-item-meta">${date}</div>
-        </div>
-        <div class="mission-feed-item-body">
-          ${body ? body + '<br>' : ''}
-          <a href="${e.link}" target="_blank" rel="noopener">Open post ↗</a>
-        </div>
-      </article>
-    `;
-  }).join('');
-
-  container.innerHTML = html;
-  container.dataset.hasContent = '1';
-}
-
-
-  // Update the "Last updated: …" label under the tabs
-  function renderFeedTimestamp(key, override) {
-    const label = document.getElementById('feedUpdatedLabel');
-    if (!label) return;
-
-    let ts     = override && override.ts;
-    let source = override && override.source;
-
-    // Prefer explicit override, then in-memory cache, then persistent meta
-    if (!ts && cache[key] && cache[key].time) {
-      ts = cache[key].time;
-      if (!source) source = 'cached';
-    }
+  function setUpdatedLabel(ts) {
+    if (!updatedLabel) return;
     if (!ts) {
-      const meta = readFeedMeta(key);
-      if (meta && meta.ts) {
-        ts = meta.ts;
-      }
+      updatedLabel.textContent = 'Last updated: —';
+      updatedLabel.classList.remove('stale');
+      return;
     }
+    updatedLabel.textContent = 'Last updated: ' + niceDate(ts);
+    if (Date.now() - ts > FEED_STALE_MS) {
+      updatedLabel.classList.add('stale');
+    } else {
+      updatedLabel.classList.remove('stale');
+    }
+  }
 
-    if (!ts) {
-      label.textContent = 'Last updated: —';
-      label.className = 'feed-updated';
-      label.title = '';
+  function renderSkeleton() {
+    // keep your existing skeleton markup on first load;
+    // on subsequent loads we can just leave the current content
+    // or clear it and insert lightweight placeholders if you prefer.
+  }
+
+  function renderItems(feedKey, payload) {
+    const { updated, items } = payload;
+
+    const filtered = applyBlocklist(items, blocklist).slice(0, MAX_ITEMS);
+
+    listEl.innerHTML = '';
+
+    if (!filtered.length) {
+      const empty = document.createElement('div');
+      empty.className = 'feed-empty';
+      empty.textContent = `Unable to load ${FEED_LABEL[feedKey] || 'feed'} right now.`;
+      listEl.appendChild(empty);
+      setUpdatedLabel(updated ? new Date(updated).getTime() : null);
       return;
     }
 
-    if (!source) source = 'live';
+    filtered.forEach(item => {
+      const article = document.createElement('article');
+      article.className = 'feed-item';
 
-    const now    = Date.now();
-    const ageMs  = now - ts;
-    const isStale = ageMs > FEED_STALE_MS;
+      const header = document.createElement('div');
+      header.className = 'feed-header';
 
-    const dt = new Date(ts);
-    const timeStr = dt.toLocaleTimeString([], {
-      hour: 'numeric',
-      minute: '2-digit'
+      const pill = document.createElement('span');
+      pill.className = 'feed-pill';
+      pill.textContent = FEED_LABEL[feedKey] || 'Feed';
+
+      const time = document.createElement('span');
+      time.className = 'feed-time';
+      time.textContent = item.date ? niceDate(item.date) : '';
+
+      header.appendChild(pill);
+      header.appendChild(time);
+
+      const titleLink = document.createElement('a');
+      titleLink.className = 'feed-title';
+      titleLink.href = item.url || '#';
+      titleLink.target = '_blank';
+      titleLink.rel = 'noopener noreferrer';
+      titleLink.textContent = item.title || '(no title)';
+
+      const body = document.createElement('p');
+      body.className = 'feed-body';
+      body.textContent = (item.summary || '').replace(/\s+/g, ' ').trim().slice(0, 280) + '…';
+
+      article.appendChild(header);
+      article.appendChild(titleLink);
+      article.appendChild(body);
+
+      listEl.appendChild(article);
     });
 
-    let suffix;
-if (source === 'cached') {
-  suffix = '(cached)';
-} else if (source === 'offline') {
-  suffix = '(offline; last good)';
-} else {
-  suffix = '(live)';
-}
-
-label.textContent = `Last updated: ${timeStr} ${suffix}`;
-
-    label.className = 'feed-updated' + (isStale ? ' stale' : '');
-
-    const minutes = Math.max(0, Math.floor(ageMs / 60000));
-    const hours   = Math.floor(minutes / 60);
-    const remMin  = minutes % 60;
-    const ageText = hours
-      ? `${hours}h ${remMin}m ago`
-      : `${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-
-    label.title = `Updated ${ageText}`;
+    const ts = updated ? new Date(updated).getTime() : Date.now();
+    setUpdatedLabel(ts);
   }
 
-  // --- In-memory cache: { key: { time, items } } ---
-
-  const cache = {};
-
-  async function loadFeed(key, opts) {
-    const force = opts && opts.force;
-    const list  = document.getElementById('missionFeedList');
-    if (!list) return;
-
-    const hadContent = list.dataset.hasContent === '1';
-
+  async function fetchFeed(feedKey, { force } = {}) {
     try {
-      // 1) In-memory cache (fast path)
-      if (!force && cache[key] && Date.now() - cache[key].time < FEED_CACHE_TTL) {
-        renderFeed(list, key, cache[key].items);
-        renderFeedTimestamp(key, { ts: cache[key].time, source: 'cached' });
+      const cached = !force && getCache(feedKey);
+      if (cached) {
+        renderItems(feedKey, cached);
         return;
       }
 
-      // 2) Persistent cache (smooth instant load)
-      if (!force) {
-        const stored = readPersistentFeed(key);
-        if (stored) {
-          cache[key] = { time: stored.ts, items: stored.items };
-          renderFeed(list, key, stored.items);
-          renderFeedTimestamp(key, { ts: stored.ts, source: 'cached' });
-          // still continue to fetch fresh network data
-        }
-      }
+      renderSkeleton();
 
-      // 3) Lightweight loading if nothing visible yet
-          if (!hadContent && list.dataset.hasContent !== '1') {
-        // Leave the existing skeleton markup in place; just track that
-        // we don't have real content yet.
-        list.dataset.hasContent = '0';
-      }
+      const url = FEED_RSS[feedKey];
+      if (!url) throw new Error('Unknown feed ' + feedKey);
 
-      // 4) Fetch fresh live data
-      const items = await fetchFeed(key);
-      cache[key] = { time: Date.now(), items };
-      writePersistentFeed(key, items);
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
 
-      renderFeed(list, key, items);
-      renderFeedTimestamp(key, { ts: cache[key].time, source: 'live' });
+      const parsed = parseAtom(text);
+      setCache(feedKey, parsed);
+      renderItems(feedKey, parsed);
     } catch (err) {
-  console.warn('[MissionFeed] failed', err);
-
-  // If we had *no* content yet, show the error message
-  if (list.dataset.hasContent !== '1') {
-    list.innerHTML =
-      `<div class="mission-feed-empty">Unable to load ${FEED_LABEL[key]} right now.</div>`;
-    list.dataset.hasContent = '0';
-  }
-
-  // Tiny offline hint on the "Last updated" line
-  const meta = readFeedMeta(key);
-  if (meta && meta.ts) {
-    // We have an older snapshot in MC – show it as "offline; last good"
-    renderFeedTimestamp(key, { ts: meta.ts, source: 'offline' });
-  } else {
-    // No history at all – just mark as offline in a simple way
-    const label = document.getElementById('feedUpdatedLabel');
-    if (label) {
-      label.textContent = 'Last updated: offline';
-      label.className = 'feed-updated stale';
-      label.title = 'Feed is offline or unreachable';
+      console.warn('[MissionFeed] failed', err);
+      listEl.innerHTML = '';
+      const div = document.createElement('div');
+      div.className = 'feed-empty';
+      div.textContent = `Unable to load ${FEED_LABEL[feedKey] || 'feed'} right now.`;
+      listEl.appendChild(div);
+      setUpdatedLabel(null);
     }
   }
-}
 
-  }
+  // --- Blocklist UI -------------------------------------------------------
 
-  // --- Wire up tabs & refresh (Filter button is handled by the drawer UI script) ---
+  function renderBlocklistChips() {
+    if (!blockListEl) return;
+    blockListEl.innerHTML = '';
 
-  window.addEventListener('DOMContentLoaded', () => {
-    const tabs       = document.querySelectorAll('.mission-feed-tab');
-    const refreshBtn = document.getElementById('missionFeedRefresh');
-    const list       = document.getElementById('missionFeedList');
-
-    if (!tabs.length || !refreshBtn || !list) return;
-
-    // Restore last selected tab from MC storage
-    let currentFeed = 'spacex';
-    try {
-      if (typeof MC !== 'undefined' && typeof MC.get === 'function') {
-        const saved = MC.get('missionFeed', 'spacex');
-        if (saved && FEED_RSS[saved]) {
-          currentFeed = saved;
-        }
-      }
-    } catch (e) {
-      console.warn('[MissionFeed] unable to read saved tab', e);
+    if (!blocklist.length) {
+      const empty = document.createElement('div');
+      empty.className = 'feed-filter-empty';
+      empty.textContent = 'No filters active.';
+      blockListEl.appendChild(empty);
+      return;
     }
 
-    // Activate correct tab visually
-    tabs.forEach(tab => {
-      const key = tab.dataset.feed;
-      tab.classList.toggle('active', key === currentFeed);
-    });
-
-    // 1) Attempt to paint from persistent cache immediately
-    const stored = readPersistentFeed(currentFeed);
-    if (stored) {
-      cache[currentFeed] = { time: stored.ts, items: stored.items };
-      renderFeed(list, currentFeed, stored.items);
-      renderFeedTimestamp(currentFeed, { ts: stored.ts, source: 'cached' });
-    } else {
-      list.dataset.hasContent = '0';
-    }
-
-    // Tab clicks
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => {
-        const key = tab.dataset.feed;
-        if (!key || key === currentFeed) return;
-
-        currentFeed = key;
-        tabs.forEach(t => t.classList.toggle('active', t === tab));
-
-        // Persist current tab selection
-        try {
-          if (typeof MC !== 'undefined' && typeof MC.set === 'function') {
-            MC.set('missionFeed', currentFeed);
-          }
-        } catch (e) {
-          console.warn('[MissionFeed] unable to save tab', e);
-        }
-
-        loadFeed(currentFeed);
+    blocklist.forEach((word, idx) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'feed-filter-chip';
+      chip.textContent = word;
+      chip.addEventListener('click', () => {
+        blocklist.splice(idx, 1);
+        saveBlocklist(blocklist);
+        renderBlocklistChips();
+        fetchFeed(currentFeed, { force: true });
       });
+      blockListEl.appendChild(chip);
     });
+  }
 
-    // Refresh button: force bypass cache
-    refreshBtn.addEventListener('click', () => {
-      loadFeed(currentFeed, { force: true });
+  if (blockAddBtn && blockInput) {
+    const addFn = () => {
+      const val = (blockInput.value || '').trim();
+      if (!val) return;
+      if (!blocklist.includes(val)) {
+        blocklist.push(val);
+        saveBlocklist(blocklist);
+        renderBlocklistChips();
+        fetchFeed(currentFeed, { force: true });
+      }
+      blockInput.value = '';
+    };
+    blockAddBtn.addEventListener('click', addFn);
+    blockInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addFn();
+      }
     });
+  }
 
-    // Kick off initial live refresh in the background
-    loadFeed(currentFeed);
+  if (blockClearBtn) {
+    blockClearBtn.addEventListener('click', () => {
+      blocklist = [];
+      saveBlocklist(blocklist);
+      renderBlocklistChips();
+      fetchFeed(currentFeed, { force: true });
+    });
+  }
+
+  if (filterBtn && filterPanel) {
+    filterBtn.addEventListener('click', () => {
+      const hidden = filterPanel.hasAttribute('hidden');
+      if (hidden) {
+        filterPanel.removeAttribute('hidden');
+      } else {
+        filterPanel.setAttribute('hidden', '');
+      }
+    });
+  }
+
+  // --- Tab + refresh wiring ----------------------------------------------
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const feedKey = tab.getAttribute('data-feed') || 'spacex';
+      currentFeed = feedKey;
+
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      fetchFeed(feedKey, { force: false });
+    });
   });
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      fetchFeed(currentFeed, { force: true });
+    });
+  }
+
+  // --- Initial load -------------------------------------------------------
+
+  renderBlocklistChips();
+  // auto-open panel if you already have filters
+  if (filterPanel && blocklist.length) {
+    filterPanel.removeAttribute('hidden');
+  }
+
+  // default feed = spacex
+  fetchFeed(currentFeed, { force: true });
 })();
 </script>
+
 
 <script>
 // === Mission Control Notification Helpers ===
