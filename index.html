@@ -1,0 +1,4517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+  <meta charset="UTF-8" />
+  <title>Mission Control</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#020817">
+<link rel="icon" sizes="192x192" href="./icons/icon-192.png">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><text y='50%' font-size='52'>🚀</text></svg>">
+
+  <!-- Preconnects -->
+  <link rel="preconnect" href="https://www.youtube.com">
+  <link rel="preconnect" href="https://i.ytimg.com">
+  <link rel="preconnect" href="https://www.google.com">
+  <link rel="preconnect" href="https://www.iheart.com">
+
+  <style>
+  
+  /* Align the date + subtitle under the left side of the Mission Control header */
+.date-display,
+.subtitle {
+  text-align: left;
+  margin-top: 4px;
+  margin-bottom: 0;
+  margin-left: 0;
+  margin-right: auto;
+  max-width: 900px;      /* keep it within your content column */
+  padding-left: 32px;    /* tweak this until it visually lines up with the pill */
+}
+
+  /* Mission Control header badge */
+.mc-banner {
+  position: relative;
+  margin: 0 auto 18px;
+  padding: 16px 26px;
+  border-radius: 20px;
+  background: radial-gradient(circle at 20% 30%, rgba(56,189,248,0.22), rgba(7,11,25,0.95));
+  border: 1px solid rgba(56,189,248,0.38);
+  box-shadow: 0 10px 35px rgba(15,23,42,1);
+  display: inline-block;
+  overflow: hidden;
+}
+
+/* Soft inner edge */
+.mc-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 1px rgba(56,189,248,0.20),
+    inset 0 0 24px rgba(56,189,248,0.08);
+  pointer-events: none;
+}
+
+/* Animated glow sweep */
+.mc-banner-glow {
+  position: absolute;
+  left: -40%;
+  top: -20%;
+  width: 80%;
+  height: 160%;
+  background: radial-gradient(circle, rgba(56,189,248,0.35), transparent 70%);
+  filter: blur(52px);
+  opacity: 0.28;
+  animation: mcBannerSweep 8s ease-in-out infinite;
+}
+
+@keyframes mcBannerSweep {
+  0%   { transform: translateX(-30%); opacity: 0.17; }
+  40%  { opacity: 0.26; }
+  100% { transform: translateX(130%); opacity: 0.20; }
+}
+
+/* Layout inside badge */
+.mc-banner-inner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+/* SVG orb icon */
+.mc-icon {
+  display: inline-flex;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 30% 20%, #1f2937, #020617);
+  box-shadow:
+    0 0 0 1px rgba(56,189,248,0.55),
+    0 10px 24px rgba(15,23,42,1);
+  padding: 4px;
+}
+
+.mc-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Title text */
+.mc-banner-text {
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.20em;
+  color: var(--accent);
+  text-shadow: 0 0 12px rgba(56,189,248,0.75);
+  white-space: nowrap;
+}
+
+/* Smaller screens */
+@media (max-width: 480px) {
+  .mc-banner {
+    padding: 12px 18px;
+  }
+  .mc-banner-inner {
+    gap: 10px;
+  }
+  .mc-icon {
+    width: 32px;
+    height: 32px;
+  }
+  .mc-banner-text {
+    font-size: 22px;
+    letter-spacing: 0.16em;
+  }
+}
+
+
+  /* Auto-rounding for responsive launch banners */
+.banner-rounded {
+  border-radius: clamp(18px, 4vw, 32px);
+  overflow: hidden;
+}
+
+  /* Draggable region for window-controls-overlay */
+.app-titlebar {
+  position: fixed;
+  top: 0;
+  left: env(titlebar-area-x, 0);
+  width: env(titlebar-area-width, 100%);
+  height: env(titlebar-area-height, 32px);
+  -webkit-app-region: drag;
+  app-region: drag;
+  background: transparent;
+  z-index: 9999;
+}
+
+/* If you ever put clickable buttons up there, prevent dragging */
+.nodrag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+}
+
+    :root{
+      --bg:#020817; --card-bg:#070d23; --accent:#38bdf8; --accent-soft:rgba(56,189,248,.18);
+      --text:#e5e7eb; --muted:#9ca3af; --radius:18px; --shadow-soft:0 18px 45px rgba(15,23,42,.9);
+      --transition-fast:.18s ease-out; --font:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      --btn-glow: rgba(56,189,248,.45);
+    }
+:root {
+  /* you probably already have --radius defined;
+     these two are just for the dynamic banner curve */
+  --banner-radius-min: 18px;  /* desktop-ish */
+  --banner-radius-max: 32px;  /* very round on narrow screens */
+}
+
+/* Auto-adjusting rounded banners */
+.banner-rounded {
+  border-radius: clamp(var(--banner-radius-min), 4vw, var(--banner-radius-max));
+  overflow: hidden; /* keeps glow/content from spilling over curved corners */
+}
+
+    *{box-sizing:border-box;margin:0;padding:0}
+	html, body{
+  overflow-y:hidden;
+}
+
+	
+body{
+  font-family:var(--font);
+  background:radial-gradient(circle at top,#0f172a 0,#020817 40%,#000 100%);
+  color:var(--text);
+  min-height:100vh;
+  padding:0px 18px 24px;
+  position:relative;
+
+  /* allow scrolling, but no sideways jiggle */
+  overflow-x:hidden;
+  overflow-y:auto;
+
+  /* default: normal block flow (good for mobile) */
+  display:block;
+}
+
+@media (min-width: 1024px){
+  body{
+    display:flex;
+    justify-content:center;
+  }
+}
+
+
+    /* Starfield */
+    body::before{
+      content:""; position:fixed; inset:0; z-index:0; pointer-events:none; will-change:background-position;
+      background:
+        radial-gradient(2px 2px at 10% 20%, rgba(255,255,255,.55) 40%, transparent 60%),
+        radial-gradient(2px 2px at 80% 90%, rgba(255,255,255,.50) 40%, transparent 60%),
+        radial-gradient(1.5px 1.5px at 50% 50%, rgba(255,255,255,.50) 40%, transparent 60%),
+        radial-gradient(1.5px 1.5px at 30% 80%, rgba(255,255,255,.45) 40%, transparent 60%);
+      background-repeat:repeat; background-size:260px 260px;
+      animation:starfield-pan 60s linear infinite;
+    }
+    @keyframes starfield-pan{
+      from{background-position:0 0,0 0,0 0,0 0}
+      to  {background-position:-120px -240px,-120px -240px,-120px -240px,-120px -240px}
+    }
+    @media (prefers-reduced-motion:reduce){ body::before{animation:none} }
+
+    .wrapper{ position:relative; z-index:1; width:100%; max-width:1200px;
+      opacity:0; transform:scale(1.02); filter:brightness(.4);
+      transition:opacity 1.2s ease-out, transform 1.2s ease-out, filter 1.2s ease-out;
+    }
+    .wrapper.ready{ opacity:1; transform:scale(1); filter:brightness(1) }
+
+    header{ margin-bottom:24px; display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap }
+    header.stuck{ position:sticky; top:0; z-index:5; background:linear-gradient(to bottom, rgba(2,8,23,.98), rgba(2,8,23,.88));
+      border-bottom:1px solid rgba(148,163,253,.1); box-shadow:0 10px 30px rgba(0,0,0,.55); margin-top:-10px; padding-top:10px }
+
+    ... margin-top:-10px; padding-top:10px }
+
+    .title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;   /* <<< THIS fixes alignment */
+}
+
+
+
+    h1{ font-size:30px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--accent) }
+    .subtitle{ font-size:13px; color:var(--muted) }
+    .date-display{ font-size:13px; color:#9ca3af; margin-top:2px }
+
+    .pill-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:4px }
+    .pill{ font-size:9px; padding:4px 9px; border-radius:999px; border:1px solid rgba(148,163,253,.32);
+      background:rgba(10,16,35,.96); color:var(--muted); display:inline-flex; align-items:center; gap:4px;
+      position:relative; overflow:hidden; isolation:isolate; cursor:pointer;
+      transition:transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+    }
+    .pill span.icon{ font-size:10px; color:var(--accent) }
+	/* === DATA STREAM pill === */
+.data-pill{
+  cursor:default;
+  font-size:9px;
+  padding:3px 10px;
+  letter-spacing:0.12em;
+  text-transform:uppercase;
+
+}
+
+.data-pill .label{
+  font-size:8px;
+  opacity:0.8;
+}
+
+.data-pill .sep{
+  opacity:0.6;
+}
+
+.data-pill .state{
+  font-weight:500;
+}
+
+.data-pill-live{
+  border-color:rgba(52, 211, 153, 0.9);
+  color:#bbf7d0;
+  box-shadow:0 0 16px rgba(34,197,94,0.35);
+}
+
+.data-pill-cached{
+  border-color:rgba(250,204,21,0.9);
+  color:#fef9c3;
+  box-shadow:0 0 14px rgba(250,204,21,0.32);
+}
+
+.data-pill-stale{
+  border-color:rgba(249,115,22,0.9);
+  color:#fed7aa;
+  box-shadow:0 0 14px rgba(249,115,22,0.32);
+}
+
+.data-pill-offline{
+  border-color:rgba(148,163,184,0.7);
+  color:#9ca3af;
+  opacity:0.85;
+}
+
+
+    .clock{ font-family:"Segoe UI",system-ui,sans-serif; font-size:18px; color:var(--accent);
+      padding:6px 11px; border-radius:999px; background:rgba(6,11,25,.98); border:1px solid rgba(56,189,248,.28);
+      box-shadow:0 12px 30px rgba(15,23,42,.9); min-width:145px; text-align:center }
+
+    .header-right{ margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:10px }
+    .hdr-controls{ display:flex; align-items:center; gap:10px }
+
+    /* Launch banners */
+    .next-launch{ margin:16px 0 10px; padding:14px 16px; border-radius:999px; background:rgba(6,11,25,.98);
+      border:1px solid rgba(56,189,248,.28); box-shadow:0 12px 30px rgba(15,23,42,.9);
+      display:flex; align-items:center; justify-content:space-between; gap:14px }
+    .next-launch .left{ display:flex; align-items:baseline; gap:10px; flex-wrap:wrap }
+    .next-launch .label{ font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent) }
+    .next-launch .title{ font-size:22px; font-weight:600; line-height:1.1; color:var(--text) }
+    .next-launch .meta{ font-size:12px; color:var(--muted) }
+    .next-launch .countdown{ font-size:20px; font-weight:600; color:var(--accent); padding:8px 14px; border-radius:999px;
+      background:rgba(10,16,35,.96); border:1px solid rgba(56,189,248,.28); min-width:210px; text-align:center; white-space:nowrap }
+
+    .visit{ font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--text);
+      padding:8px 14px; border-radius:999px; border:1px solid rgba(148,163,253,.28);
+      background:radial-gradient(circle at top, rgba(56,189,248,.16), rgba(7,11,25,1));
+      text-decoration:none; display:inline-flex; align-items:center; gap:8px; position:relative; overflow:hidden; isolation:isolate;
+      transition:transform var(--transition-fast), box-shadow var(--transition-fast);
+    }
+    .visit:hover{ transform:translateY(-1px); box-shadow:0 16px 40px rgba(15,23,42,1) }
+
+    @media (max-width:800px){
+      .next-launch{ flex-direction:column; align-items:stretch }
+      .next-launch .countdown{ width:100% }
+    }
+    .next-launch.small{ margin-top:8px; padding:10px 12px;}
+    .next-launch.small .title{ font-size:18px }
+    .next-launch.small .countdown{ font-size:16px; min-width:180px }
+    .next-launch.small .label{ font-size:10px }
+    .next-launch.small .meta{ font-size:11px }
+
+    /* Cards */
+    .grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:16px }
+    .grid.compact{ gap:12px }
+    .grid.compact .card{ padding:10px 10px 9px; border-radius:14px }
+    .grid.compact .card-title{ font-size:13px }
+    .grid.compact .card-desc{ font-size:9px }
+    .grid.compact .card-label,.grid.compact .card-footer{ font-size:8px }
+
+    .card{
+  content-visibility: auto;
+  contain-intrinsic-size: 220px 180px;
+  background:radial-gradient(circle at top, var(--accent-soft), var(--card-bg));
+  border-radius:var(--radius); padding:14px 12px 11px; box-shadow:var(--shadow-soft);
+      border:1px solid rgba(148,163,253,.16); cursor:pointer; display:flex; flex-direction:column; gap:4px;
+      text-decoration:none; color:var(--text); position:relative; overflow:hidden;
+      transition:transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+      will-change:transform, box-shadow;
+    }
+    .card > *{ position:relative; z-index:1 }
+    .card:hover{ transform:translateY(-3px); box-shadow:0 18px 40px rgba(15,23,42,.95); border-color:var(--accent);
+      background:radial-gradient(circle at top, rgba(56,189,248,.22), var(--card-bg)) }
+
+    /* Card power-up flash */
+    .card.powerup::after{
+      content:""; position:absolute; inset:-60%;
+      background:radial-gradient(circle, rgba(56,189,248,.95) 0%, rgba(56,189,248,.5) 24%, rgba(255,255,255,.18) 52%, transparent 80%);
+      opacity:0; pointer-events:none; animation:powerup-flash 420ms ease-out forwards; mix-blend-mode:screen; z-index:0; filter:blur(3px)
+    }
+    .card.powerup::before{
+      content:""; position:absolute; top:50%; left:50%; width:28px; height:28px; border-radius:999px;
+      border:2px solid rgba(56,189,248,.95); transform:translate(-50%,-50%) scale(.4); opacity:0; pointer-events:none; mix-blend-mode:screen; z-index:0; animation:ripple-wave 520ms ease-out forwards; filter:blur(1px)
+    }
+    @keyframes powerup-flash{0%{opacity:0;transform:scale(.6)}28%{opacity:1;transform:scale(1.05)}60%{opacity:.7;transform:scale(1.3)}100%{opacity:0;transform:scale(1.7)}}
+    @keyframes ripple-wave{0%{opacity:0;transform:translate(-50%,-50%) scale(.4)}20%{opacity:1}60%{opacity:.5}100%{opacity:0;transform:translate(-50%,-50%) scale(3.4)}}
+
+    .card-label{ font-size:9px; text-transform:uppercase; letter-spacing:.16em; color:var(--accent) }
+    .card-title{ font-size:14px; font-weight:500; line-height:1.25 }
+    .card-desc{ font-size:10px; color:var(--muted) }
+    .card-footer{ margin-top:5px; display:flex; justify-content:space-between; align-items:center; font-size:9px; color:var(--muted) }
+    .status-dot{ width:7px; height:7px; border-radius:999px; background:#22c55e; box-shadow:0 0 9px rgba(34,197,94,.9); margin-right:4px; display:inline-block }
+    .open-label{ font-size:9px; color:var(--accent) }
+    .hint{
+      margin-top:14px;
+      font-size:9px;
+      color:var(--muted);
+      text-align:right;
+    }
+
+    /* Mission Feed Card (SpaceX / Elon / Launches) */
+    .mission-feed-card{
+      max-width:1200px;
+      margin:40px auto 12px;
+      padding:18px 22px 16px;
+      border-radius:var(--radius);
+      background:
+        radial-gradient(circle at top, rgba(56,189,248,0.18), rgba(7,13,35,0.96));
+      border:1px solid rgba(148,163,184,0.28);
+      box-shadow:var(--shadow-soft);
+      backdrop-filter:blur(18px);
+    }
+
+    .mission-feed-header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+
+    .mission-feed-title{
+      font-size:18px;
+      font-weight:600;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      color:var(--accent);
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+
+    .mission-feed-tabs{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-bottom:10px;
+    }
+
+    .mission-feed-tab{
+      padding:6px 12px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,0.38);
+      background:rgba(15,23,42,0.9);
+      color:var(--muted);
+      font-size:12px;
+      letter-spacing:.11em;
+      text-transform:uppercase;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      transition:
+        background var(--transition-fast),
+        border-color var(--transition-fast),
+        color var(--transition-fast),
+        transform var(--transition-fast);
+    }
+
+    .mission-feed-tab:hover{
+      border-color:rgba(148,163,184,0.7);
+      color:var(--text);
+      transform:translateY(-1px);
+    }
+
+    .mission-feed-tab.active{
+      background:var(--accent-soft);
+      color:var(--accent);
+      border-color:rgba(56,189,248,0.85);
+      box-shadow:0 0 0 1px rgba(56,189,248,0.55);
+    }
+
+    .mission-feed-refresh{
+      padding:6px 12px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,0.45);
+      background:rgba(15,23,42,0.95);
+      color:var(--muted);
+      font-size:11px;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      transition:
+        background var(--transition-fast),
+        border-color var(--transition-fast),
+        color var(--transition-fast),
+        transform var(--transition-fast);
+      white-space:nowrap;
+    }
+
+    .mission-feed-refresh:hover{
+      background:var(--accent-soft);
+      border-color:rgba(56,189,248,0.9);
+      color:var(--accent);
+      transform:translateY(-1px);
+    }
+	    .mission-feed-actions{
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    .mission-feed-actions{
+      display:flex;
+      gap:8px;
+      align-items:center;
+    }
+
+    .mission-feed-filter{
+      font-size:11px;
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,0.55);
+      background:transparent;
+      color:var(--muted);
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      transition:
+        background var(--transition-fast),
+        color var(--transition-fast),
+        border-color var(--transition-fast),
+        transform var(--transition-fast);
+      white-space:nowrap;
+    }
+
+    .mission-feed-filter:hover{
+      background:var(--accent-soft);
+      border-color:rgba(56,189,248,0.9);
+      color:var(--accent);
+      transform:translateY(-1px);
+    }
+
+    .mission-feed-filter.active{
+      color:var(--accent);
+      border-color:var(--accent);
+      background:rgba(56,189,248,0.12);
+    }
+
+    .feed-filter-panel{
+      margin-top:8px;
+      padding:10px 12px;
+      border-radius:12px;
+      background:rgba(15,23,42,0.95);
+      border:1px solid rgba(30,64,175,0.7);
+      box-shadow:0 14px 40px rgba(15,23,42,0.85);
+    }
+
+    .feed-filter-panel[hidden]{
+      display:none;
+    }
+
+    .feed-filter-row{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:6px;
+      font-size:11px;
+      color:var(--muted);
+    }
+
+    .feed-filter-label{
+      text-transform:uppercase;
+      letter-spacing:.14em;
+      font-size:10px;
+      opacity:.9;
+    }
+
+    .feed-filter-clear{
+      border:none;
+      background:none;
+      font-size:11px;
+      color:#f97373;
+      cursor:pointer;
+      opacity:0.8;
+    }
+
+    .feed-filter-clear:hover{
+      opacity:1;
+    }
+
+    .feed-filter-chips{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      margin-bottom:8px;
+    }
+
+    .feed-filter-chip{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:4px 8px;
+      font-size:11px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,0.55);
+      background:rgba(15,23,42,0.98);
+      cursor:pointer;
+    }
+
+    .feed-filter-chip-x{
+      font-size:10px;
+      opacity:0.8;
+    }
+
+    .feed-filter-empty{
+      font-size:11px;
+      color:var(--muted);
+    }
+
+    .feed-filter-input-row{
+      display:flex;
+      gap:6px;
+    }
+
+    .feed-filter-input-row input{
+      flex:1;
+      padding:6px 8px;
+      border-radius:999px;
+      border:1px solid rgba(55,65,81,0.9);
+      background:#020617;
+      color:var(--text);
+      font-size:12px;
+    }
+
+    .feed-filter-input-row input:focus{
+      outline:none;
+      border-color:var(--accent);
+    }
+
+    .feed-filter-add{
+      padding:6px 10px;
+      border-radius:999px;
+      border:none;
+      background:var(--accent);
+      color:#020617;
+      font-size:11px;
+      cursor:pointer;
+      font-weight:500;
+      white-space:nowrap;
+    }
+
+/* ============================================================
+   ONLINE MODE — scroll feed if user has a short display
+   ============================================================ */
+body.mc-online .feed-outer {
+  max-height: calc(100vh - 260px); /* tweak as needed */
+  overflow-y: auto;
+  padding-right: 6px;
+  scrollbar-width: thin;
+}
+
+body.mc-online .feed-outer::-webkit-scrollbar {
+  width: 6px;
+}
+body.mc-online .feed-outer::-webkit-scrollbar-thumb {
+  background: rgba(56,189,248,0.3);
+  border-radius: 4px;
+}
+body.mc-online .feed-outer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+
+    .mission-feed-filter{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid rgba(148,163,184,0.35);
+      background:rgba(15,23,42,0.9);
+      color:var(--muted);
+      font-size:10px;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      opacity:0.9;
+      transition:
+        background var(--transition-fast),
+        border-color var(--transition-fast),
+        color var(--transition-fast),
+        transform var(--transition-fast),
+        opacity var(--transition-fast);
+      white-space:nowrap;
+    }
+
+    .mission-feed-filter:hover{
+      background:rgba(15,23,42,1);
+      border-color:rgba(56,189,248,0.9);
+      color:var(--accent);
+      transform:translateY(-1px);
+      opacity:1;
+    }
+
+
+    .mission-feed-body{
+      margin-top:6px;
+      border-radius:calc(var(--radius) - 4px);
+      overflow:hidden;
+      background:#020617;
+    }
+	    /* Feed last-updated status (under tabs) */
+    .feed-status{
+      margin: 2px 2px 4px;
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      opacity: 0.8;
+      user-select: none;
+    }
+
+    .feed-updated{
+      white-space: nowrap;
+      transition: color 0.25s ease, opacity 0.25s ease;
+    }
+
+    /* Turns orange when older than 1 hour */
+    .feed-updated.stale{
+      color: #f97316;
+      opacity: 1;
+    }
+
+
+    /* (You can delete this if you’re not using the iframe anymore) */
+    .mission-feed-frame{
+      width:100%;
+      height:520px;
+      border:0;
+      display:block;
+    }
+
+    @media (max-width:768px){
+      .mission-feed-card{
+        margin:28px 12px 10px;
+        padding:14px 14px 12px;
+      }
+      .mission-feed-title{
+        font-size:16px;
+        letter-spacing:.12em;
+      }
+    }
+
+    /* === New compact feed list styles (OUTSIDE the media query) === */
+
+       .mission-feed-list{
+      padding:14px 12px 16px;
+      max-height:520px;
+      overflow-y:auto;
+      scrollbar-width:thin;
+    }
+
+    /* Shared loading skeleton styles (feed + launch banners) */
+    .skeleton {
+      position: relative;
+      overflow: hidden;
+      color: transparent !important;
+      background: linear-gradient(90deg, #020617, #111827, #020617);
+      background-size: 200% 100%;
+      animation: skeleton-shimmer 1.2s ease-in-out infinite;
+    }
+
+    .skeleton-line {
+      display: block;
+      border-radius: 999px;
+      min-height: 0.85em;
+    }
+
+    .skeleton-pill {
+      display: inline-block;
+      border-radius: 999px;
+      min-height: 1.4em;
+    }
+
+    .skeleton-line.short {
+      width: 55%;
+    }
+
+    .skeleton-line.tiny {
+      width: 30%;
+    }
+
+    @keyframes skeleton-shimmer {
+      0%   { background-position: -120% 0; }
+      100% { background-position: 120% 0; }
+    }
+
+	    
+    .feed-skeleton {
+      padding: 10px 12px;
+      margin-bottom: 10px;
+      border-radius: 12px;
+      background: radial-gradient(
+        circle at top,
+        rgba(15, 23, 42, 0.98),
+        rgba(2, 6, 23, 1)
+      );
+      border: 1px solid rgba(15, 23, 42, 0.9);
+    }
+
+    .feed-skeleton-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+
+    .feed-skeleton-pill {
+      height: 10px;
+      width: 120px;
+      border-radius: 999px;
+      opacity: 0.85;
+    }
+
+    .feed-skeleton-time {
+      height: 8px;
+      width: 80px;
+      border-radius: 999px;
+      opacity: 0.6;
+    }
+
+    .feed-skeleton-line {
+      height: 9px;
+      border-radius: 999px;
+      margin-bottom: 6px;
+      opacity: 0.85;
+    }
+
+    .feed-skeleton-line.short {
+      width: 65%;
+      opacity: 0.7;
+    }
+
+    /* Slight tweak so the old "empty" state plays nice if it ever shows */
+    .mission-feed-empty {
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+      padding: 24px 10px;
+      opacity: 0.8;
+    }
+
+
+    .mission-feed-item{
+      padding:10px 12px;
+      margin-bottom:10px;
+      border-radius:12px;
+      background:radial-gradient(circle at top, rgba(15,23,42,.98), rgba(2,6,23,1));
+      border:1px solid rgba(148,163,184,.32);
+      box-shadow:0 12px 30px rgba(15,23,42,.9);
+    }
+
+    .mission-feed-item-header{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:10px;
+      margin-bottom:6px;
+    }
+
+    .mission-feed-item-title{
+      font-size:13px;
+      font-weight:500;
+      color:var(--text);
+    }
+
+    .mission-feed-item-meta{
+      font-size:10px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+
+    .mission-feed-item-body{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .mission-feed-item-body a{
+      color:var(--accent);
+      text-decoration:none;
+      font-weight:500;
+    }
+
+    .mission-feed-item-body a:hover{
+      text-decoration:underline;
+    }
+/* === Feed pill + time row (SpaceX · Nov 17, 12:25 PM CST) === */
+
+.mission-feed-item-header > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;                /* <-- this is what fixes "SpaceXNov" */
+}
+
+/* Little source pill: "SpaceX", "Elon Musk", etc */
+.feed-pill {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(56,189,248,0.16);
+  color: #bae6fd;
+}
+
+/* Date/time text next to the pill */
+.feed-time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+
+    @media (max-width:768px){
+      .mission-feed-list{
+        max-height:480px;
+      }
+    }
+
+.last-updated {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  
+  font-size: 12px;
+  color: #9ca3af;
+  opacity: 0.65;
+  
+  letter-spacing: 0.4px;
+  user-select: none;
+
+  transition: opacity 0.35s ease, color 0.35s ease;
+  padding-left: 2px;
+    margin-bottom: 8px;
+
+}
+.disabled-notify {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  filter: grayscale(0.35);
+}
+/* Smooth transitions for notify buttons */
+#notifyBtn,
+#notifyBtn2 {
+  transition:
+    background-color 0.25s ease,
+    box-shadow 0.25s ease,
+    transform 0.15s ease;
+}
+
+/* When a T−10 notification is scheduled */
+#notifyBtn.notify-scheduled,
+#notifyBtn2.notify-scheduled {
+  box-shadow: 0 0 18px rgba(56, 189, 248, 0.5); /* soft cyan-ish glow */
+}
+
+/* Slight hover lift when scheduled */
+#notifyBtn.notify-scheduled:hover,
+#notifyBtn2.notify-scheduled:hover {
+  transform: translateY(-1px);
+}
+
+/* We already have this, keeping it for clarity */
+.disabled-notify {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+}
+
+
+
+
+    /* Power On Overlay */
+
+    .power-on-overlay{ position:fixed; inset:0; background:radial-gradient(circle at top, rgba(56,189,248,.16), rgba(2,8,23,.98));
+      display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; z-index:9999; color:var(--text); text-align:center }
+    @supports (backdrop-filter:blur(6px)){ .power-on-overlay{ backdrop-filter:blur(6px) } }
+    .power-on-title{ font-size:26px; letter-spacing:.18em; text-transform:uppercase; color:var(--accent) }
+    .power-on-sub{ font-size:12px; color:var(--muted); max-width:340px }
+    .power-on-base{ margin-top:18px; display:flex; align-items:center; justify-content:center }
+    .power-on-button{
+      position:relative; width:180px; height:180px; border-radius:50%; border:none; cursor:pointer;
+      background:radial-gradient(circle at 30% 20%, #ffffff, #fee2e2 14%, #f97316 30%, #ef4444 52%, #7f1d1d 100%);
+      box-shadow:0 18px 0 #7f1d1d, 0 34px 55px rgba(0,0,0,.98), 0 0 48px rgba(239,68,68,.95);
+      display:flex; align-items:center; justify-content:center; color:#111827; font-weight:900; font-size:16px; letter-spacing:.30em; text-transform:uppercase; text-shadow:0 2px 4px rgba(0,0,0,.95);
+      transition:all .16s ease-out
+    }
+    .power-on-button:hover{ transform:translateY(-4px); box-shadow:0 14px 0 #7f1d1d, 0 40px 70px rgba(0,0,0,1), 0 0 60px rgba(239,68,68,1) }
+    .power-on-button:active{ transform:translateY(10px); box-shadow:0 6px 0 #7f1d1d, 0 18px 32px rgba(0,0,0,.98), 0 0 30px rgba(239,68,68,.85);
+      background:radial-gradient(circle at 30% 18%, #fee2e2, #f97316 18%, #b91c1c 52%, #450a0a 100%) }
+    .power-on-overlay.hide{ opacity:0; transform:scale(1.03); pointer-events:none; transition:opacity .35s ease-out, transform .35s ease-out }
+
+    /* Overrides Modal (subtle edge glow) */
+    .mc-modal{ position:fixed; inset:0; z-index:10000; opacity:0; transform:scale(.98); transition:opacity .25s ease-out, transform .25s ease-out }
+    .mc-modal.show{ opacity:1; transform:scale(1) }
+    .mc-modal.hidden{ display:none }
+    .mc-modal__backdrop{ position:absolute; inset:0; background:rgba(2,8,23,.6); backdrop-filter:blur(2px); opacity:0; transition:opacity .25s ease-out }
+    .mc-modal.show .mc-modal__backdrop{ opacity:1 }
+    .mc-modal__card{
+      position:relative; max-width:860px; margin:6vh auto; background:#070d23;
+      border:1px solid rgba(148,163,253,.2); border-radius:16px; box-shadow:0 24px 80px rgba(0,0,0,.7); padding:16px;
+      overflow:hidden;
+    }
+    /* Light-catching inner edge + soft outer halo (no animation) */
+    .mc-modal__card::before{
+      content:""; position:absolute; inset:0; pointer-events:none;
+      box-shadow: inset 0 0 0 1px rgba(56,189,248,.14), inset 0 0 34px rgba(56,189,248,.06);
+      border-radius:16px;
+    }
+    .mc-modal__card::after{
+      content:""; position:absolute; inset:-6px; pointer-events:none; border-radius:20px;
+      box-shadow: 0 0 80px rgba(56,189,248,.12);
+    }
+
+    .mc-modal__header,.mc-modal__footer{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px }
+    .mc-modal__title{ font-size:18px; color:var(--accent); letter-spacing:.08em; text-transform:uppercase }
+    .mc-modal__sub{ font-size:12px; color:var(--muted) }
+    .mc-modal__body{ display:grid; gap:14px }
+    .mc-form .mc-row{ display:grid; grid-template-columns:1fr 1fr; gap:10px }
+    .mc-form label{ display:grid; gap:6px; font-size:12px; color:var(--muted) }
+    .mc-form input{ padding:8px 10px; border-radius:10px; border:1px solid rgba(148,163,253,.25); background:#0b1431; color:var(--text) }
+    .mc-checkbox{ align-items:center; grid-template-columns:auto 1fr; display:grid; gap:8px }
+    .mc-list{ border-top:1px solid rgba(148,163,253,.16); padding-top:10px; display:grid; gap:8px }
+    .mc-item{ display:grid; gap:8px; padding:10px; border:1px solid rgba(148,163,253,.16); border-radius:12px;
+      background:radial-gradient(circle at top, rgba(56,189,248,.08), rgba(7,11,25,1)) }
+    .mc-item__top{ display:flex; justify-content:space-between; align-items:center; gap:10px }
+    .mc-item__title{ font-size:14px }
+    .mc-item__meta{ font-size:12px; color:var(--muted) }
+    .mc-item__btns{ display:flex; gap:8px }
+    .mc-btn{ padding:8px 12px; border-radius:999px; border:1px solid rgba(148,163,253,.28); background:rgba(10,16,35,.96); color:var(--text); cursor:pointer }
+    .mc-btn--ghost{ background:transparent }
+    .mc-btn--danger{ border-color:rgba(239,68,68,.5); color:#fecaca }
+    .mc-btn:hover,.mc-btn:focus-visible{
+      transform:translateY(-1px); border-color:var(--accent);
+      box-shadow:0 16px 40px rgba(15,23,42,1), 0 0 0 3px rgba(56,189,248,.15) inset; outline:none
+    }
+
+    /* Volume slider */
+    .mc-sfx{display:flex;align-items:center;gap:12px}
+    .mc-vol{ --thumb:var(--accent); --track:#0b1431; --track-border:rgba(148,163,253,.28); --glow:rgba(56,189,248,.35);
+      width:160px; height:28px; cursor:pointer; appearance:none; background:transparent }
+    .mc-vol:focus{outline:none}
+    .mc-vol::-webkit-slider-runnable-track{ height:8px; border-radius:999px; background:linear-gradient(90deg,var(--accent-soft),rgba(7,11,35,.95));
+      border:1px solid var(--track-border); box-shadow:0 8px 20px rgba(0,0,0,.6) inset }
+    .mc-vol::-webkit-slider-thumb{ appearance:none; margin-top:-6px; width:20px; height:20px; border-radius:50%;
+      background:radial-gradient(circle at 30% 30%, #fff, var(--thumb) 45%, #0ea5e9 80%);
+      border:1px solid rgba(148,163,253,.5); box-shadow:0 0 0 3px rgba(56,189,248,.15), 0 6px 18px rgba(56,189,248,.35);
+      transition:transform .12s ease-out, box-shadow .12s ease-out }
+    .mc-vol:active::-webkit-slider-thumb{ transform:scale(1.06) }
+    .mc-vol::-moz-range-track{ height:8px; border-radius:999px; background:linear-gradient(90deg,var(--accent-soft),rgba(7,11,35,.95));
+      border:1px solid var(--track-border); box-shadow:0 8px 20px rgba(0,0,0,.6) inset }
+    .mc-vol::-moz-range-thumb{ width:20px; height:20px; border-radius:50%;
+      background:radial-gradient(circle at 30% 30%, #fff, var(--thumb) 45%, #0ea5e9 80%);
+      border:1px solid rgba(148,163,253,.5); box-shadow:0 0 0 3px rgba(56,189,248,.15), 0 6px 18px rgba(56,189,248,.35);
+      transition:transform .12s ease-out, box-shadow .12s ease-out }
+    @keyframes vol-pulse{ 0%{box-shadow:0 0 0 0 rgba(56,189,248,0)} 40%{box-shadow:0 0 0 6px rgba(56,189,248,.22)} 100%{box-shadow:0 0 0 0 rgba(56,189,248,0)} }
+    .mc-vol.pulse{ animation:vol-pulse .35s ease-out }
+
+    /* Button ripple + color pulse for .pill and .visit */
+    .pill::after,.visit::after{
+      content:""; position:absolute; left:var(--rx,50%); top:var(--ry,50%); width:12px; height:12px; border-radius:999px;
+      background:radial-gradient(circle, rgba(56,189,248,.45) 0%, rgba(56,189,248,.20) 40%, transparent 60%);
+      transform:translate(-50%,-50%) scale(0); opacity:0; pointer-events:none;
+    }
+    .btn-wave::after{ animation:btn-ripple 420ms ease-out forwards }
+    @keyframes btn-ripple{
+      0%{transform:translate(-50%,-50%) scale(0); opacity:.45}
+      70%{opacity:.22}
+      100%{transform:translate(-50%,-50%) scale(18); opacity:0}
+    }
+    .pill.pulse-press,.visit.pulse-press{
+      box-shadow:0 0 14px var(--btn-glow), 0 0 2px rgba(56,189,248,.6) inset;
+      transition:box-shadow .4s ease-out;
+    }
+	/* Subtle hover polish for header pills + details buttons */
+.pill:hover,
+.pill:focus-visible {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 10px 24px rgba(15,23,42,0.9), 0 0 0 2px rgba(56,189,248,0.10) inset;
+  outline: none;
+}
+
+.visit:hover,
+.visit:focus-visible {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  box-shadow: 0 12px 32px rgba(15,23,42,1), 0 0 0 2px rgba(56,189,248,0.12) inset;
+  outline: none;
+}
+/* === Flight Deck Radio === */
+
+.radio-card {
+  background: radial-gradient(circle at 0% 0%, #0f172a 0, #020817 55%);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-soft);
+  padding: 14px 16px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.radio-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 110% -10%, rgba(56, 189, 248, 0.15), transparent 55%);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.radio-top,
+.radio-middle,
+.radio-bottom {
+  position: relative;
+  z-index: 1;
+}
+
+/* Header */
+
+.radio-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 10px;
+}
+
+.radio-label {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  opacity: 0.9;
+}
+
+.radio-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Station buttons */
+
+.radio-stations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.radio-station {
+  flex: 1 1 30%;
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: rgba(15, 23, 42, 0.9);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    transform 120ms ease;
+  text-align: left;
+}
+
+.radio-station .station-name {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.radio-station .station-desc {
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.radio-station:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.radio-station.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+/* Active state polish (selected station tile) */
+.radio-station.active {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.55),
+    0 12px 26px rgba(15, 23, 42, 0.9);
+  background: radial-gradient(
+    circle at 0% 0%,
+    rgba(56, 189, 248, 0.25),
+    rgba(15, 23, 42, 0.95)
+  );
+}
+/* Stronger glow + soft pulse when the station is actually playing */
+.radio-station.playing {
+  box-shadow:
+    0 0 0 1px rgba(56, 189, 248, 0.8),
+    0 0 30px rgba(56, 189, 248, 0.65),
+    0 16px 40px rgba(15, 23, 42, 0.95);
+  animation: stationPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes stationPulse {
+  0% {
+    box-shadow:
+      0 0 0 1px rgba(56, 189, 248, 0.55),
+      0 0 18px rgba(56, 189, 248, 0.45),
+      0 12px 30px rgba(15, 23, 42, 0.9);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(56, 189, 248, 0.95),
+      0 0 32px rgba(56, 189, 248, 0.9),
+      0 20px 50px rgba(15, 23, 42, 1);
+  }
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(56, 189, 248, 0.55),
+      0 0 18px rgba(56, 189, 248, 0.45),
+      0 12px 30px rgba(15, 23, 42, 0.9);
+  }
+}
+
+
+/* Tiny VU meter – tied to .playing class from JS */
+.radio-vu {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 18px;
+  margin-left: 10px;
+  opacity: 0.9;
+}
+
+.vu-bar {
+  width: 3px;
+  height: 16px;              /* <-- this is the important bit */
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.65);
+  transform-origin: bottom center;
+  transform: scaleY(0.25);
+}
+
+/* Bars only animate when the audio is actually playing */
+.radio-vu.playing .bar1 {
+  animation: vuBar1 550ms ease-in-out infinite;
+}
+.radio-vu.playing .bar2 {
+  animation: vuBar2 480ms ease-in-out infinite;
+}
+.radio-vu.playing .bar3 {
+  animation: vuBar3 620ms ease-in-out infinite;
+}
+
+
+/* Slightly different patterns so it looks organic */
+@keyframes vuBar1 {
+  0%   { transform: scaleY(0.2); }
+  35%  { transform: scaleY(0.9); }
+  70%  { transform: scaleY(0.4); }
+  100% { transform: scaleY(0.7); }
+}
+
+@keyframes vuBar2 {
+  0%   { transform: scaleY(0.3); }
+  25%  { transform: scaleY(1.0); }
+  60%  { transform: scaleY(0.35); }
+  100% { transform: scaleY(0.8); }
+}
+
+@keyframes vuBar3 {
+  0%   { transform: scaleY(0.25); }
+  30%  { transform: scaleY(0.75); }
+  65%  { transform: scaleY(0.3); }
+  100% { transform: scaleY(0.95); }
+}
+
+
+
+/* Now playing */
+
+.radio-middle {
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.95),
+    rgba(15, 23, 42, 0.9)
+  );
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.now-playing-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  margin-bottom: 2px;
+}
+
+.now-playing-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.now-playing-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.now-playing-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.now-playing-art {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: radial-gradient(circle at 30% 20%, #1f2937, #020617);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.9);
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.22s ease-out, transform 0.22s ease-out;
+}
+
+.now-playing-art img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.now-playing-art.show {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* On very small screens, hide the art to keep things clean */
+@media (max-width: 480px) {
+  .now-playing-art {
+    display: none;
+  }
+}
+
+
+/* Controls */
+
+.radio-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 2px;
+}
+
+.radio-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.radio-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  border: none;
+  outline: none;
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background var(--transition-fast),
+    transform 120ms ease,
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.radio-btn:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4);
+}
+
+.radio-btn:active {
+  transform: scale(0.94);
+}
+
+/* Volume */
+
+.radio-volume {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  justify-content: flex-end;
+}
+
+.volume-icon {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+#radioVolume {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 110px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(31, 41, 55, 0.95);
+  outline: none;
+}
+
+/* Range thumb */
+
+#radioVolume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.28);
+  cursor: pointer;
+}
+
+#radioVolume::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.28);
+  cursor: pointer;
+}
+
+/* Small screens tweak */
+
+@media (max-width: 640px) {
+  .radio-card {
+    padding: 12px 12px 10px;
+  }
+
+  .radio-volume #radioVolume {
+    width: 90px;
+  }
+}
+/* === Compact "one-screen" layout tweaks (desktop only) === */
+@media (min-width: 1200px) {
+
+  /* Body: tighter top/bottom padding */
+  body {
+    padding-top: 16px;
+    padding-bottom: 8px;
+  }
+
+  /* Header & banner spacing */
+  header {
+    margin-bottom: 12px;
+  }
+
+  .mc-banner {
+    margin-bottom: 8px;
+    padding: 10px 18px;
+  }
+
+  .title-block {
+    gap: 2px;
+  }
+
+  .date-display {
+    margin-top: 4px;
+  }
+
+  /* Launch banners: slightly slimmer */
+  .next-launch {
+    margin: 8px 0 4px;
+    padding: 8px 12px;
+  }
+
+  .next-launch.small {
+    margin-top: 4px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .next-launch .title {
+    font-size: 20px;
+  }
+
+  .next-launch .countdown {
+    font-size: 18px;
+    padding: 6px 12px;
+  }
+
+  /* Radio card: a bit shorter */
+  .radio-card {
+    padding: 10px 12px 8px;
+  }
+
+  .radio-title {
+    font-size: 15px;
+  }
+
+  /* Stream tiles: slightly tighter grid */
+  .grid {
+    gap: 10px;
+  }
+
+  /* Social feed card: pulled up and compressed */
+  .mission-feed-card {
+  margin-top: 6px;     /* was 16px */
+  padding: 12px 14px 4px;  /* optional small trim */
+}
+
+
+  /* ⬇️ OVERRIDE: no inner scroll, let page height handle it */
+  .mission-feed-list {
+    max-height: none;
+    overflow-y: visible;
+    padding-bottom: 8px;
+  }
+
+  .mission-feed-item {
+    padding: 6px 8px;
+    margin-bottom: 6px;
+  }
+
+  .mission-feed-item-title {
+    font-size: 11px;
+  }
+
+  .mission-feed-item-body {
+    font-size: 10px;
+  }
+
+  .mission-feed-item-meta {
+    font-size: 9px;
+  }
+
+  .feed-status {
+    margin-top: 0;
+    margin-bottom: 2px;
+    font-size: 10px;
+  }
+}
+
+/* === Mission Control header pulse ============================= */
+
+@keyframes mc-pulse-soft {
+  0% {
+    transform: translateY(0);
+    box-shadow:
+      0 24px 60px rgba(15, 23, 42, 0.9),
+      0 0 0 rgba(56, 189, 248, 0);
+    opacity: 1;
+  }
+  35% {
+    transform: translateY(-0.5px);
+    box-shadow:
+      0 26px 70px rgba(15, 23, 42, 1),
+      0 0 18px rgba(56, 189, 248, 0.8);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(0);
+    box-shadow:
+      0 24px 60px rgba(15, 23, 42, 0.9),
+      0 0 0 rgba(56, 189, 248, 0);
+    opacity: 1;
+  }
+}
+
+/* Class that triggers a one-shot pulse */
+.mc-title-pulse {
+  animation: mc-pulse-soft 650ms ease-out;
+}
+
+
+  </style>
+</head>
+
+<body>
+  
+
+  <!-- POWER ON SCREEN -->
+  <div id="powerOn" class="power-on-overlay">
+    <div class="power-on-title">MISSION CONTROL</div>
+    <div class="power-on-sub">Systems nominal. Press LAUNCH to power on visuals, audio, and the launch grid.</div>
+    <div class="power-on-base"><button id="powerOnBtn" class="power-on-button">LAUNCH</button></div>
+  </div>
+
+  <div class="wrapper">
+    <!-- your existing content continues here -->
+
+  <header>
+    <div class="title-block">
+
+      <div class="mc-banner">
+  <div class="mc-banner-glow"></div>
+
+  <div class="mc-banner-inner">
+    <span class="mc-icon" aria-hidden="true">
+      <svg viewBox="0 0 64 64">
+        <defs>
+          <!-- Rocket gradient -->
+          <linearGradient id="mcRocketGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"  stop-color="#e0f2fe"/>
+            <stop offset="40%" stop-color="#38bdf8"/>
+            <stop offset="100%" stop-color="#0ea5e9"/>
+          </linearGradient>
+
+          <!-- Orbit ring glow -->
+          <radialGradient id="mcOrbitGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="rgba(56,189,248,0.9)"/>
+            <stop offset="70%" stop-color="rgba(56,189,248,0.15)"/>
+            <stop offset="100%" stop-color="transparent"/>
+          </radialGradient>
+        </defs>
+
+        <!-- Soft halo -->
+        <circle cx="32" cy="32" r="28" fill="url(#mcOrbitGlow)" />
+
+        <!-- Orbit ring -->
+        <circle cx="32" cy="32" r="22"
+                fill="none"
+                stroke="rgba(148,163,184,0.9)"
+                stroke-width="2.2"
+                stroke-linecap="round"
+                stroke-dasharray="6 4" />
+
+        <!-- Rocket body -->
+        <path d="M32 10
+                 C38 18 41 26 41 32
+                 L35 36
+                 L29 36
+                 L23 32
+                 C23 26 26 18 32 10Z"
+              fill="url(#mcRocketGrad)" />
+
+        <!-- Window -->
+        <circle cx="32" cy="25" r="3.4" fill="#0f172a"
+                stroke="#e0f2fe" stroke-width="1.2" />
+
+        <!-- Fins -->
+        <path d="M29 36 L24 42 L26 34 Z"
+              fill="#0ea5e9" opacity="0.9" />
+        <path d="M35 36 L40 42 L38 34 Z"
+              fill="#0ea5e9" opacity="0.9" />
+
+        <!-- Flame -->
+        <path d="M29 36
+                 C30.5 41 30.8 46 32 50
+                 C33.2 46 33.5 41 35 36Z"
+              fill="#f97316" />
+      </svg>
+    </span>
+
+    <div class="mc-banner-text">MISSION&nbsp;CONTROL</div>
+  </div>
+</div>
+
+      <div id="dateDisplay" class="date-display">Loading date...</div>
+      <div class="subtitle">Click a tile to open the live stream in YouTube (with chat) or launch your music.</div>
+
+    </div>
+
+
+
+     <div class="header-right">
+
+  <!-- DATA STREAM pill, right-aligned above the clock -->
+  <div style="display:flex; justify-content:flex-end; margin-bottom:4px;">
+    <div id="dataStatus" class="pill data-pill">
+      <span class="icon">📡</span>
+      <span class="label">DATA</span>
+      <span class="sep">•</span>
+      <span class="state">BOOT</span>
+    </div>
+  </div>
+
+  <div style="display:flex; align-items:center; gap:8px; justify-content:flex-end;">
+    <div class="clock" id="clock">--:--:--</div>
+    <button id="ambientToggle" class="pill" style="font-size:12px;padding:4px 10px;opacity:.65;" aria-pressed="true" title="Toggle ambient">🔇</button>
+  </div>
+
+  <div class="pill-row" style="gap:6px;margin-top:2px;">
+    <button id="compactToggle" class="pill" aria-pressed="false">🗜️ Compact</button>
+<button id="clockToggle" class="pill">🕒 24h</button>
+</div>
+
+<div class="hdr-controls mc-sfx">
+  <span class="hdr-label">SFX</span>
+  <input
+    type="range"
+    id="sfxVol"
+    min="0"
+    max="1"
+    step="0.01"
+    value="0.35"
+    class="mc-vol"
+    aria-label="Sound effects volume"
+  >
+  <button id="testLiftoff" class="pill sfx-test">Test liftoff</button>
+</div>
+</div>
+
+
+    </header>
+
+    <!-- Primary banner -->
+  <div class="next-launch banner-rounded" id="nextLaunch">
+  <div class="left">
+    <div class="label">Next launch</div>
+    <div>
+      <div
+        class="title skeleton skeleton-line"
+        id="nlTitle"
+      >
+        Loading next launch…
+      </div>
+      <div
+        class="meta skeleton skeleton-line short"
+        id="nlWhen"
+      >
+        Fetching window…
+      </div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div
+      class="countdown skeleton skeleton-pill"
+      id="nlCountdown"
+    >
+      T- —d --h --m --s
+    </div>
+    <a
+      class="visit"
+      href="#"
+      id="nlLink"
+      target="_blank"
+      rel="noopener"
+    >
+      View details
+    </a>
+    <button class="pill nodrag" id="notifyBtn">
+      Notify T−10m
+    </button>
+  </div>
+</div>
+
+
+  <!-- Secondary banner -->
+<div class="next-launch small banner-rounded" id="anyLaunch">
+  <div class="left">
+    <div class="label">Also coming up</div>
+    <div>
+      <div
+        class="title skeleton skeleton-line"
+        id="nl2Title"
+      >
+        Loading…
+      </div>
+      <div
+        class="meta skeleton skeleton-line short"
+        id="nl2When"
+      >
+        Fetching window…
+      </div>
+    </div>
+  </div>
+
+  <div class="right">
+    <div
+      class="countdown skeleton skeleton-pill"
+      id="nl2Countdown"
+    >
+      T- —d --h --m --s
+    </div>
+    <a
+      class="visit"
+      href="#" 
+      id="nl2Link"
+      target="_blank"
+      rel="noopener"
+    >
+      View details
+    </a>
+    <button class="pill nodrag" id="notifyBtn2">
+      Notify T−10m
+    </button>
+  </div>
+</div>
+
+
+<div id="launchLastUpdated" class="last-updated">
+  Last updated: …
+</div>
+
+<!-- Flight Deck Radio -->
+<section class="card radio-card" id="flightDeckRadio">
+  <div class="radio-top">
+    <div class="radio-header">
+      <div class="radio-label">Mission Control</div>
+      <div class="radio-title">Flight Deck Radio</div>
+    </div>
+
+    <div class="radio-stations" id="radioStations">
+      <!-- Station buttons -->
+      <button class="radio-station active" data-station="station1">
+        <span class="station-name">IHeart80s</span>
+        <span class="station-desc">iHeart – 80s</span>
+      </button>
+      <button class="radio-station" data-station="station2">
+        <span class="station-name">IHeartCountry 90s</span>
+        <span class="station-desc">90s Country</span>
+      </button>
+      <button class="radio-station" data-station="station3">
+        <span class="station-name">80s Rock Ride</span>
+        <span class="station-desc">80s Rock</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="radio-middle">
+  <div class="now-playing-label">Now playing</div>
+
+  <div class="now-playing-row">
+    <div class="now-playing-main">
+      <div class="now-playing-title" id="radioNowPlaying">
+        Select a station to start…
+      </div>
+    </div>
+
+    <div class="now-playing-art" id="radioArtWrapper">
+      <img id="radioArt" src="" alt="" loading="lazy" hidden />
+    </div>
+  </div>
+</div>
+
+
+   <div class="radio-bottom">
+  <div class="radio-controls">
+    <button class="radio-btn" id="radioPlayPause" aria-label="Play/Pause">
+      ▶
+    </button>
+    <button class="radio-btn" id="radioStop" aria-label="Stop">
+      ■
+    </button>
+
+    <!-- Tiny VU meter -->
+    <div class="radio-vu" id="radioVu" aria-hidden="true">
+      <span class="vu-bar bar1"></span>
+      <span class="vu-bar bar2"></span>
+      <span class="vu-bar bar3"></span>
+    </div>
+  </div>
+
+  <div class="radio-volume">
+    <span class="volume-icon">🔊</span>
+    <input
+      type="range"
+      id="radioVolume"
+      min="0"
+      max="100"
+      value="75"
+      aria-label="Volume"
+    />
+  </div>
+</div>
+
+
+
+  <!-- Hidden audio element -->
+  <audio id="radioAudio" preload="none"></audio>
+</section>
+
+    <!-- Cards -->
+    <section class="grid">
+      <a class="card" href="https://www.youtube.com/watch?v=inCQ49QGmqQ" target="_blank" rel="noopener">
+        <div class="card-label">YouTube • Stream</div><div class="card-title">Rover 1</div>
+        <div class="card-desc">Primary launch / space coverage.</div>
+        <div class="card-footer"><div><span class="status-dot"></span>Opens with chat</div><div class="open-label">Launch</div></div>
+      </a>
+      <a class="card" href="https://www.youtube.com/watch?v=tS2PHJmvJzo" target="_blank" rel="noopener">
+        <div class="card-label">YouTube • Stream</div><div class="card-title">Rover 2</div>
+        <div class="card-desc">Alternate live feed / commentary.</div>
+        <div class="card-footer"><div><span class="status-dot"></span>New tab</div><div class="open-label">Launch</div></div>
+      </a>
+      <a class="card" href="https://www.youtube.com/watch?v=1_XLpEKtW8Y" target="_blank" rel="noopener">
+        <div class="card-label">YouTube • Stream</div><div class="card-title">Lab Cam</div>
+        <div class="card-desc">Additional mission / propulsion coverage.</div>
+        <div class="card-footer"><div><span class="status-dot"></span>Interactive</div><div class="open-label">Launch</div></div>
+      </a>
+      <a class="card" href="https://www.youtube.com/watch?v=QYO-tNjkQO8" target="_blank" rel="noopener">
+        <div class="card-label">YouTube • Stream</div><div class="card-title">Multi Plex</div>
+        <div class="card-desc">Official webcast / primary launches.</div>
+        <div class="card-footer"><div><span class="status-dot"></span>With chat</div><div class="open-label">Launch</div></div>
+      </a>
+      <a class="card" href="https://www.youtube.com/watch?v=Dr3g-1r9BbI" target="_blank" rel="noopener">
+        <div class="card-label">YouTube • Stream</div><div class="card-title">Sapphire Cam</div>
+        <div class="card-desc">Alt perspective / analysis.</div>
+        <div class="card-footer"><div><span class="status-dot"></span>Live discussion</div><div class="open-label">Launch</div></div>
+      </a>
+      <a class="card" href="https://www.youtube.com/watch?v=oOj_x6H74mA" target="_blank" rel="noopener">
+        <div class="card-label">YouTube • Stream</div><div class="card-title">Nerdle Cam</div>
+        <div class="card-desc">Mission analysis & coverage.</div>
+        <div class="card-footer"><div><span class="status-dot"></span>Chat on</div><div class="open-label">Launch</div></div>
+      </a>
+      <a class="card" href="https://www.youtube.com/watch?v=KIi0IbNO6J4" target="_blank" rel="noopener">
+        <div class="card-label">YouTube • Stream</div><div class="card-title">Gator Cam</div>
+        <div class="card-desc">Space / science coverage.</div>
+        <div class="card-footer"><div><span class="status-dot"></span>Interactive</div><div class="open-label">Launch</div></div>
+      </a>
+      <a class="card" href="https://www.youtube.com/watch?v=qw3uaLRrYNY" target="_blank" rel="noopener">
+        <div class="card-label">YouTube • Stream</div><div class="card-title">Rocket Ranch</div>
+        <div class="card-desc">Additional live coverage / events.</div>
+        <div class="card-footer"><div><span class="status-dot"></span>Opens on YouTube</div><div class="open-label">Launch</div></div>
+      </a>
+      <a class="card" href="https://www.youtube.com/watch?v=mhJRzQsLZGg" target="_blank" rel="noopener">
+        <div class="card-label">YouTube • Stream</div><div class="card-title">NASASpaceflight</div>
+        <div class="card-desc">Official live coverage, updates, and analysis from NASA Spaceflight.</div>
+        <div class="card-footer"><div><span class="status-dot"></span>Live now</div><div class="open-label">Watch</div></div>
+      </a>
+      <a class="card" href="https://www.youtube.com/@SpaceX/videos" target="_blank" rel="noopener">
+  <div class="card-label">YouTube • Archive</div>
+  <div class="card-title">Launch Archive</div>
+  <div class="card-desc">Watch replays of launches, tests, and mission coverage.</div>
+  <div class="card-footer">
+    <div><span class="status-dot"></span>On-demand</div>
+    <div class="open-label">Open</div>
+  </div>
+</a>
+
+    </section>
+<!-- Mission Social Feed (compact list + blocklist filter) -->
+<section class="mission-feed-card">
+  <div class="mission-feed-header">
+    <div class="mission-feed-title">
+      <span class="icon">🐦</span>
+      Mission Social Feed
+    </div>
+
+    <!-- New: actions group (Filter + Refresh) -->
+    <div class="mission-feed-actions">
+      <button class="mission-feed-filter" id="missionFeedFilter" type="button">
+        Filter
+      </button>
+      <button class="mission-feed-refresh" id="missionFeedRefresh" type="button">
+        ⟳ Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- New: Blocklist settings panel -->
+  <div class="feed-filter-panel" id="feedBlockPanel" hidden>
+    <div class="feed-filter-row">
+      <div class="feed-filter-label">Blocked keywords / domains</div>
+      <button type="button" id="feedBlockClear" class="feed-filter-clear">
+        Clear all
+      </button>
+    </div>
+
+    <div class="feed-filter-chips" id="feedBlockList">
+      <div class="feed-filter-empty">No filters active.</div>
+    </div>
+
+    <div class="feed-filter-input-row">
+      <input
+        id="feedBlockInput"
+        type="text"
+        autocomplete="off"
+        placeholder="Add keyword or domain… (press Enter)" />
+      <button type="button" id="feedBlockAdd" class="feed-filter-add">
+        Add
+      </button>
+    </div>
+  </div>
+
+  <!-- Your existing tabs stay the same -->
+  <div class="mission-feed-tabs" role="tablist" aria-label="Mission social feeds">
+    <button class="mission-feed-tab active" data-feed="spacex" type="button">
+      <span>SpaceX</span>
+    </button>
+    <button class="mission-feed-tab" data-feed="elon" type="button">
+      <span>Elon Musk</span>
+    </button>
+    <button class="mission-feed-tab" data-feed="launches" type="button">
+      <span>Launch Notices</span>
+    </button>
+  </div>
+
+  <!-- Your existing "Last updated" + feed list follow here, unchanged -->
+
+
+  <!-- Feed last-updated status line -->
+  <div class="feed-status">
+    <span id="feedUpdatedLabel" class="feed-updated">Last updated: —</span>
+  </div>
+
+   <div class="mission-feed-body">
+    <div id="missionFeedList" class="mission-feed-list">
+	<!-- NEW wrapper that will scroll on small/online screens -->
+    <div class="feed-outer">
+      <div id="missionFeedList" class="mission-feed-list">
+      <!-- Skeleton placeholders – will be replaced by real feed items -->
+      <article class="feed-skeleton">
+        <div class="feed-skeleton-header">
+          <div class="feed-skeleton-pill skeleton"></div>
+          <div class="feed-skeleton-time skeleton"></div>
+        </div>
+        <div class="feed-skeleton-line skeleton"></div>
+        <div class="feed-skeleton-line skeleton short"></div>
+      </article>
+
+      <article class="feed-skeleton">
+        <div class="feed-skeleton-header">
+          <div class="feed-skeleton-pill skeleton"></div>
+          <div class="feed-skeleton-time skeleton"></div>
+        </div>
+        <div class="feed-skeleton-line skeleton"></div>
+        <div class="feed-skeleton-line skeleton"></div>
+        <div class="feed-skeleton-line skeleton short"></div>
+      </article>
+    </div>
+  </div>
+
+</section>
+
+
+
+
+
+    </div>
+
+
+    
+  </div>
+
+  <!-- Sounds -->
+  <audio id="hoverSound"  src="./audio/blip.mp3"     preload="auto"></audio>
+  <audio id="startupHum"  src="./audio/liftoff.mp3"  preload="auto"></audio>
+  <audio id="ambientHum"  src="./audio/ambient.mp3"  preload="auto" loop></audio>
+
+<!-- ONLINE mode detection -->
+<script>
+  // Run immediately in the head
+  (function () {
+    const host = location.hostname || "";
+
+    const isLocal =
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host.startsWith("192.168.");
+
+    if (!isLocal) {
+      // If body isn't ready yet, add once DOM is loaded
+      if (document.body) {
+        document.body.classList.add("mc-online");
+      } else {
+        window.addEventListener("DOMContentLoaded", () => {
+          document.body.classList.add("mc-online");
+        });
+      }
+    }
+  })();
+</script>
+
+<!-- Clock -->
+<script>
+  const LS = { get(k,d){ try{return JSON.parse(localStorage.getItem(k)) }catch{return d} }, set(k,v){ localStorage.setItem(k, JSON.stringify(v)) } };
+  const is24h = () => !!LS.get('mc.clock24h', false);
+
+  function updateClock(){
+    const clockEl = document.getElementById("clock");
+    const dateEl  = document.getElementById("dateDisplay");
+    const optsDate = { timeZone:"America/Chicago", weekday:"short", month:"short", day:"numeric", year:"numeric" };
+    const optsTime = { timeZone:"America/Chicago", hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:!is24h(), timeZoneName:"short" };
+    const now = new Date();
+    dateEl.textContent  = now.toLocaleDateString("en-US", optsDate);
+    clockEl.textContent = now.toLocaleTimeString("en-US", optsTime);
+  }
+  updateClock(); setInterval(updateClock, 1000);
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('clockToggle');
+    if (btn){
+      btn.textContent = is24h() ? '🕒 12h' : '🕒 24h';
+      btn.addEventListener('click', () => {
+        LS.set('mc.clock24h', !is24h());
+        btn.textContent = is24h() ? '🕒 12h' : '🕒 24h';
+        updateClock();
+      });
+    }
+  });
+</script>
+
+<script>
+// Mission Control persistent settings helper
+
+const MC = {
+  set(key, value) {
+    try {
+      localStorage.setItem("mc." + key, JSON.stringify(value));
+    } catch (e) {
+      console.warn("[MC] Failed to save setting:", key, e);
+    }
+  },
+
+  get(key, fallback = null) {
+    try {
+      const raw = localStorage.getItem("mc." + key);
+      return raw !== null ? JSON.parse(raw) : fallback;
+    } catch (e) {
+      console.warn("[MC] Failed to load setting:", key, e);
+      return fallback;
+    }
+  }
+};
+</script>
+
+
+  <!-- Overrides Modal -->
+  <div id="overridesModal" class="mc-modal hidden" aria-hidden="true">
+    <div class="mc-modal__backdrop"></div>
+    <div class="mc-modal__card" role="dialog" aria-modal="true" aria-labelledby="ovTitle">
+      <div class="mc-modal__header">
+        <div>
+          <div id="ovTitle" class="mc-modal__title">Launch Overrides</div>
+          <div class="mc-modal__sub">Add items that should appear alongside (or instead of) the API results.</div>
+        </div>
+        <button id="closeOverrides" class="mc-btn mc-btn--ghost" aria-label="Close">✕</button>
+      </div>
+
+      <div class="mc-modal__body">
+        <div class="mc-form">
+          <div class="mc-row">
+            <label>Name <input id="ovName" placeholder="Starship IFT-X" /></label>
+            <label>NET (ISO) <input id="ovNet" placeholder="2025-11-20T13:00:00-06:00" /></label>
+          </div>
+          <div class="mc-row"><label>URL <input id="ovUrl" placeholder="https://nextspaceflight.com/launches/..." /></label></div>
+          <div class="mc-row">
+            <label>Provider <input id="ovProvider" placeholder="SpaceX" /></label>
+            <label>Rocket <input id="ovRocket" placeholder="Starship Super Heavy" /></label>
+          </div>
+          <div class="mc-row"><label>Mission <input id="ovMission" placeholder="Integrated Flight Test" /></label></div>
+          <div class="mc-row">
+            <label>Priority boost <input id="ovBoost" type="number" step="100" value="0" /></label>
+            <label class="mc-checkbox"><input id="ovForce" type="checkbox" /> Force primary</label>
+          </div>
+          <div class="mc-row">
+            <button id="addOverride" class="mc-btn">Add / Update</button>
+            <button id="clearForm" class="mc-btn mc-btn--ghost">Clear</button>
+          </div>
+        </div>
+        <div class="mc-list" id="overridesList"></div>
+      </div>
+
+      <div class="mc-modal__footer">
+        <button id="exportOverrides" class="mc-btn mc-btn--ghost">Export JSON</button>
+        <label class="mc-btn mc-btn--ghost">Import JSON <input id="importOverrides" type="file" accept="application/json" hidden /></label>
+        <button id="deleteAllOverrides" class="mc-btn mc-btn--danger">Delete All</button>
+        <button id="saveAndClose" class="mc-btn">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Launch banners + overrides + details link logic -->
+  <script>
+  (function () {
+    const LSK = 'missionControl.manualOverrides.v1';
+    const getOverrides = () => { try { return JSON.parse(localStorage.getItem(LSK)) || []; } catch { return []; } };
+    const setOverrides = (arr) => localStorage.setItem(LSK, JSON.stringify(arr));
+    let manualOverrides = getOverrides();
+
+    const t1 = document.getElementById('nlTitle');
+    const w1 = document.getElementById('nlWhen');
+    const c1 = document.getElementById('nlCountdown');
+    const a1 = document.getElementById('nlLink');
+
+    const t2 = document.getElementById('nl2Title');
+    const w2 = document.getElementById('nl2When');
+    const c2 = document.getElementById('nl2Countdown');
+    const a2 = document.getElementById('nl2Link');
+
+    if (!t1 || !w1 || !c1 || !t2 || !w2 || !c2) return;
+
+    const API_PRIMARY  = 'https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=25&ordering=net';
+    const API_FALLBACK = 'https://lldev.thespacedevs.com/2.2.0/launch/upcoming/?limit=25&ordering=net';
+
+    let net1 = null, net2 = null;
+
+// === Notification Button Setup ===
+// global holders for launch times (in ms)
+window.__mcNextNetMs  = null;
+window.__mcNext2NetMs = null;
+// Track last launch times we saw on the buttons (for auto-reset)
+window.__mcPrevNetMs  = null;
+window.__mcPrevNet2Ms = null;
+
+// === Launch notification state ============================================
+const notificationState = { btn1: false, btn2: false };
+// remember which launch time each button was scheduled for
+window.__mcNotifiedMs1 = null;
+window.__mcNotifiedMs2 = null;
+window._mcNotifyPrimary   = null;
+window._mcNotifySecondary = null;
+
+// Helper: update button label / disabled / tooltip based on T-10 window
+function updateNotifyButtonState(whenMs, btnEl) {
+  if (!btnEl) return;
+
+  const baseLabel = "Notify T−10m";
+
+  // Reset visual state before deciding what to do
+  btnEl.classList.remove("disabled-notify");
+  btnEl.classList.remove("notify-scheduled");
+  btnEl.title = "Notify me 10 minutes before launch";
+
+  if (!Number.isFinite(whenMs)) {
+    btnEl.textContent = baseLabel;
+    btnEl.disabled = false;
+    return;
+  }
+
+  const msToLaunch = whenMs - Date.now();
+  const msToTMinus10 = msToLaunch - 10 * 60 * 1000;
+
+  if (msToTMinus10 <= 0) {
+    btnEl.textContent = "Within T−10m 🔒";
+    btnEl.classList.add("disabled-notify");
+    btnEl.disabled = true;
+    btnEl.title = "Already within 10 minutes of launch";
+  } else {
+    btnEl.textContent = baseLabel;
+    btnEl.disabled = false;
+  }
+}
+
+
+// Schedule a one-shot T−10 notification
+function scheduleLaunchNotify(whenMs, slot = "primary", label = "Next launch") {
+  const key = slot === "secondary" ? "_mcNotifySecondary" : "_mcNotifyPrimary";
+
+  // Clear any previous scheduled alert for this slot only
+  if (window[key]) {
+    clearTimeout(window[key]);
+    window[key] = null;
+  }
+
+  const fire = () =>
+    showMissionNotification("🚀 Mission Control", `${label}: T-10 minutes to liftoff!`);
+
+  // Time until T-10, in ms
+  const msUntilAlert = whenMs - Date.now() - 10 * 60 * 1000;
+
+  // If the value is bogus or already inside T−10, don't schedule
+  if (!Number.isFinite(msUntilAlert) || msUntilAlert <= 0) {
+    console.log("[MC] Launch already within T-10 window, not scheduling new notification.");
+    return;
+  }
+
+  window[key] = setTimeout(fire, msUntilAlert);
+}
+
+// Cancel any pending timeout + close SW notifications (if any)
+function cancelLaunchNotify(slotOrTag = "primary") {
+  const key = slotOrTag === "secondary" ? "_mcNotifySecondary" : "_mcNotifyPrimary";
+
+  if (window[key]) {
+    clearTimeout(window[key]);
+    window[key] = null;
+  }
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.ready
+      .then((reg) =>
+        reg.getNotifications({ tag: slotOrTag }).then((notifs) => {
+          for (const n of notifs) n.close();
+        })
+      )
+      .catch(() => {});
+  }
+}
+
+// PRIMARY NOTIFY BUTTON (Next launch)
+const notifyBtn = document.getElementById("notifyBtn");
+if (notifyBtn) {
+  notifyBtn.addEventListener("click", async () => {
+    const currentMs = window.__mcNextNetMs;
+    if (!currentMs) {
+      alert("Launch time not loaded yet. Try again in a moment.");
+      return;
+    }
+
+    // --- TOGGLE OFF ---
+    if (notificationState.btn1 && window.__mcNotifiedMs1 === currentMs) {
+      cancelLaunchNotify("primary");
+      notificationState.btn1 = false;
+      window.__mcNotifiedMs1 = null;
+      notifyBtn.textContent = "Notify T−10m";
+      notifyBtn.title = "Notify me 10 minutes before launch";
+	  notifyBtn.classList.remove("notify-scheduled");
+      updateNotifyButtonState(currentMs, notifyBtn);
+      return;
+    }
+
+    // --- TOGGLE ON ---
+    const ok = await ensureNotifyPermission();
+    if (!ok) {
+      alert("Notifications are blocked in this browser.");
+      return;
+    }
+
+    scheduleLaunchNotify(currentMs, "primary", "Next launch");
+    notificationState.btn1 = true;
+    window.__mcNotifiedMs1 = currentMs;
+    notifyBtn.textContent = "✓ Notifying T−10m";
+    notifyBtn.title = "Notification scheduled for T−10 minutes before launch";
+    notifyBtn.classList.remove("disabled-notify");
+	notifyBtn.classList.add("notify-scheduled");
+
+  });
+}
+
+// SECONDARY NOTIFY BUTTON (Also coming up)
+const notifyBtn2 = document.getElementById("notifyBtn2");
+if (notifyBtn2) {
+  notifyBtn2.addEventListener("click", async () => {
+    const currentMs = window.__mcNext2NetMs;
+    if (!currentMs) {
+      alert("Launch time not loaded yet. Try again in a moment.");
+      return;
+    }
+
+    // --- TOGGLE OFF ---
+    if (notificationState.btn2 && window.__mcNotifiedMs2 === currentMs) {
+      cancelLaunchNotify("secondary");
+      notificationState.btn2 = false;
+      window.__mcNotifiedMs2 = null;
+      notifyBtn2.textContent = "Notify T−10m";
+      notifyBtn2.title = "Notify me 10 minutes before launch";
+      updateNotifyButtonState(currentMs, notifyBtn2);
+      return;
+    }
+
+    // --- TOGGLE ON ---
+    const ok = await ensureNotifyPermission();
+    if (!ok) {
+      alert("Notifications are blocked in this browser.");
+      return;
+    }
+
+    scheduleLaunchNotify(currentMs, "secondary", "Also coming up");
+    notificationState.btn2 = true;
+    window.__mcNotifiedMs2 = currentMs;
+    notifyBtn2.textContent = "✓ Notifying T−10m";
+    notifyBtn2.title = "Notification scheduled for T−10 minutes before launch";
+    notifyBtn2.classList.remove("disabled-notify");
+	notifyBtn2.classList.add("notify-scheduled");
+	
+  });
+}
+
+
+
+
+
+function startTicker(getDate, outEl){
+  function render(){
+    const dt = getDate();
+    if (!dt) {
+      outEl.textContent = 'Loading…';
+      return;
+    }
+
+    const ms = +dt - Date.now();
+
+    if (ms <= 0) {
+      // Keep showing LAUNCHED while this launch is past T-0
+      // When updateBoth() changes dt to the next launch, this will
+      // automatically switch back to a T- countdown.
+      outEl.textContent = 'LAUNCHED';
+      return;
+    }
+
+    const s   = Math.floor(ms / 1000);
+    const d   = Math.floor(s / 86400);
+    const h   = Math.floor((s % 86400) / 3600);
+    const m   = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+
+    outEl.textContent =
+      `T- ${d}d ${String(h).padStart(2,'0')}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
+  }
+
+  // Initial paint
+  render();
+
+  // Keep ticking forever; rely on getDate() to point at the current launch
+  setInterval(render, 1000);
+}
+
+
+
+    const isSpaceX = l => /spacex/i.test((l.launch_service_provider && l.launch_service_provider.name) || l.provider || '');
+    const isStarship = l => {
+      const name = (l.name || '') + ' ' + ((l.rocket && l.rocket.configuration && l.rocket.configuration.name) || l.rocket || '') + ' ' + ((l.mission && l.mission.name) || l.mission || '');
+      return /starship|super\s*heavy|bfr/i.test(name);
+    };
+
+    function normalizeApi(list){
+      const now = new Date();
+      return list.map(r => ({ raw:r, net:new Date(r.net || r.window_start || r.window_end || 0) }))
+                 .filter(x => x.net.toString() !== 'Invalid Date' && x.net > now);
+    }
+
+    function fromManual(man){
+      const raw = {
+        id: man.id || ('manual-' + (man.name || '').replace(/\W+/g,'-') + '-' + man.net),
+        name: man.name,
+        url: man.url || '',
+        launch_service_provider: { name: man.provider || '' },
+        rocket: { configuration: { name: man.rocket || '' } },
+        mission: man.mission ? { name: man.mission } : undefined,
+        _manual: true,
+        _priorityBoost: Number(man.priorityBoost || 0),
+        _forcePrimary: !!man.forcePrimary
+      };
+      const net = new Date(man.net);
+      return { raw, net };
+    }
+
+function fmtTs(ts) {
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+}
+
+    function mergeAndSort(apiResults){
+  const now = new Date();
+
+  const apiNorm = normalizeApi(apiResults);
+  const manualNorm = manualOverrides
+    .map(fromManual)
+    .filter(x => x.net.toString() !== 'Invalid Date' && x.net > now);
+
+  // ✅ Correct merge: spread both arrays into one
+  const merged = [...manualNorm, ...apiNorm];
+
+  const deduped = [];
+  merged.sort((a,b) => a.net - b.net);
+
+  for (const item of merged){
+    const dup = deduped.find(d =>
+      (d.raw.name || '').toLowerCase() === (item.raw.name || '').toLowerCase() &&
+      Math.abs(d.net - item.net) < 90 * 60 * 1000
+    );
+    if (!dup) deduped.push(item);
+  }
+
+  return deduped.sort((a,b) => a.net - b.net);
+}
+
+
+
+function detailsLinkFor(L){
+  const urls = [];
+  const add = (u) => {
+    if (!u || typeof u !== 'string') return;
+    if (/thespacedevs\.com\/\d|\/api\/|\.json($|\?)/i.test(u)) return; // skip API/JSON
+    urls.push(u.trim());
+  };
+
+  add(L?.url);
+  (L?.infoURLs || L?.info_urls || []).forEach(x => add(typeof x === 'string' ? x : x?.url));
+  (L?.vidURLs  || L?.vid_urls  || []).forEach(x => add(typeof x === 'string' ? x : x?.url));
+  add(L?.infographic);
+
+  // Prefer stable NextSpaceflight detail pages
+  const nxDetails = urls.find(u => /nextspaceflight\.com\/launches\/details\/\d+\/?$/i.test(u));
+  if (nxDetails) return nxDetails;
+
+  // If any NXF link exists but not a details page, send to the safe list (never 404)
+  if (urls.some(u => /nextspaceflight\.com/i.test(u))) {
+    return 'https://nextspaceflight.com/launches/';
+  }
+
+  // Otherwise first normal page, or fallback
+  return urls[0] || 'https://nextspaceflight.com/launches/';
+}
+
+
+
+
+    function renderBanner(target, chosen) {
+  const {titleEl, whenEl, countEl, linkEl} = target;
+
+  // --- remove skeleton classes once real data appears ---
+  function clearSkeleton(el) {
+    if (!el) return;
+    el.classList.remove('skeleton');
+    el.classList.remove('skeleton-line');
+    el.classList.remove('skeleton-pill');
+  }
+
+  // If no real launch data (null chosen), show fallback but keep skeleton off
+  if (!chosen) {
+    clearSkeleton(titleEl);
+    clearSkeleton(whenEl);
+    clearSkeleton(countEl);
+
+    titleEl.textContent = 'Next launch unavailable';
+    whenEl.textContent = 'Open NextSpaceflight for details.';
+    if (countEl) countEl.textContent = '';
+    if (linkEl) linkEl.href = 'https://nextspaceflight.com/launches/';
+    return { net:null };
+  }
+
+  // We have real launch data → clear skeleton shimmer now
+  clearSkeleton(titleEl);
+  clearSkeleton(whenEl);
+  clearSkeleton(countEl);
+
+  const L = chosen.raw;
+  const NET = chosen.net;
+
+  titleEl.textContent = L.name || 'Upcoming launch';
+
+  whenEl.textContent = `Target: ${NET.toLocaleString(undefined, {
+    weekday:'short',
+    month:'short',
+    day:'numeric',
+    hour:'2-digit',
+    minute:'2-digit',
+    timeZoneName:'short'
+  })}`;
+
+  if (linkEl) {
+    linkEl.href = detailsLinkFor(L);
+  }
+
+    return { net: NET };
+}
+
+
+
+
+
+    async function fetchLaunches(url){
+  console.log('[MC] fetching:', url);
+  const r = await fetch(url, { cache: 'no-store', mode: 'cors' });
+  if (!r.ok) {
+    const err = new Error(`HTTP ${r.status} ${r.statusText}`);
+    console.error('[MC] fetch failed:', err);
+    throw err;
+  }
+  const j = await r.json();
+  console.log('[MC] got results:', j);
+  return j;
+}
+
+
+    // --- Launch cache (for smoother reloads & offline fallback) ---
+    const LAUNCH_CACHE_KEY = 'mc.launchCache';
+    const LAUNCH_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+    function readLaunchCache() {
+      try {
+        const raw = localStorage.getItem(LAUNCH_CACHE_KEY);
+        if (!raw) return null;
+        const obj = JSON.parse(raw);
+        if (!obj || typeof obj !== 'object') return null;
+        if (!obj.ts || (Date.now() - obj.ts) > LAUNCH_CACHE_TTL) return null;
+        return obj;
+      } catch {
+        return null;
+      }
+    }
+
+    function writeLaunchCache(primary, secondary) {
+      try {
+        const payload = {
+          ts: Date.now(),
+          primary: primary && primary.raw && primary.net
+            ? { netMs: primary.net.getTime(), raw: primary.raw }
+            : null,
+          secondary: secondary && secondary.raw && secondary.net
+            ? { netMs: secondary.net.getTime(), raw: secondary.raw }
+            : null
+        };
+        localStorage.setItem(LAUNCH_CACHE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        console.warn('[MC] failed to write launch cache', e);
+      }
+    }
+
+        function hydrateCached(entry) {
+      if (!entry || !entry.raw || !entry.netMs) return null;
+      return { raw: entry.raw, net: new Date(entry.netMs) };
+    }
+
+    
+	async function updateBoth() {
+     const t1 = document.getElementById('nlTitle');
+     const w1 = document.getElementById('nlWhen');
+     const c1 = document.getElementById('nlCountdown');
+     const a1 = document.getElementById('nlLink');
+     const t2 = document.getElementById('nl2Title');
+     const w2 = document.getElementById('nl2When');
+     const c2 = document.getElementById('nl2Countdown');
+     const a2 = document.getElementById('nl2Link');
+
+  if (!t1 || !w1 || !c1 || !a1 || !t2 || !w2 || !c2 || !a2) return;
+
+  const API_PRIMARY  = 'https://ll.thespacedevs.com/2.2.0/launch/upcoming/?limit=10&search=spacex';
+const API_FALLBACK = 'https://lldev.thespacedevs.com/2.2.0/launch/upcoming/?limit=10&search=spacex';
+
+
+  const notifyBtn  = document.querySelector('[data-notify="primary"]');
+  const notifyBtn2 = document.querySelector('[data-notify="secondary"]');
+
+    net1 = null;
+    net2 = null;
+
+
+  function renderEmpty() {
+  renderBanner({ titleEl: t1, whenEl: w1, countEl: c1, linkEl: a1 }, null);
+  renderBanner({ titleEl: t2, whenEl: w2, countEl: c2, linkEl: a2 }, null);
+  // No countdown wiring here; startTicker handles countdowns globally.
+}
+
+
+  try {
+    let data;
+
+    try {
+      data = await fetchLaunches(API_PRIMARY);
+    } catch (err) {
+      // Only fallback on network/server errors
+      if (err.message.includes('Failed to fetch') || err.message.includes('HTTP 5')) {
+        console.warn('[MC] Primary failed, trying fallback');
+        data = await fetchLaunches(API_FALLBACK);
+      } else {
+        throw err;
+      }
+    }
+
+    const upcoming = mergeAndSort((data && data.results) || []);
+    if (!upcoming.length) {
+      renderEmpty();
+      return;
+    }
+
+    const forced = upcoming.filter(x => x.raw && x.raw._forcePrimary);
+    const preferred = forced.length
+      ? forced.sort((a, b) => a.net - b.net)[0]
+      : upcoming
+          .slice()
+          .sort((a, b) => {
+            const as = (isSpaceX(a.raw) ? 100 : 0) +
+                       (isStarship(a.raw) ? 1000 : 0) +
+                       (a.raw._priorityBoost || 0);
+            const bs = (isSpaceX(b.raw) ? 100 : 0) +
+                       (isStarship(b.raw) ? 1000 : 0) +
+                       (b.raw._priorityBoost || 0);
+            return (bs - as) || (a.net - b.net);
+          })[0];
+
+    let generic = upcoming[0];
+    if (
+      generic && preferred &&
+      +generic.net === +preferred.net &&
+      (generic.raw.id || generic.raw.name) === (preferred.raw.id || preferred.raw.name)
+    ) {
+      generic =
+        upcoming.find(x =>
+          +x.net !== +preferred.net ||
+          (x.raw.id || x.raw.name) !== (preferred.raw.id || preferred.raw.name)
+        ) || generic;
+    }
+
+    // Cache the selected launches for future reloads
+    writeLaunchCache(preferred, generic);
+
+        // Live update timestamp
+    const tsEl = document.getElementById('launchLastUpdated');
+if (tsEl) {
+  tsEl.textContent = `Last updated: ${fmtTs(Date.now())}`;
+  if (typeof pulseMissionTitle === 'function') {
+    pulseMissionTitle();
+  }
+}
+
+// ⭐ Mark data stream as LIVE, but only if helper exists
+if (typeof window.setDataStatus === 'function') {
+  window.setDataStatus('live');
+}
+
+// Render banners and capture NET times
+    net1 = renderBanner(
+      { titleEl: t1, whenEl: w1, countEl: c1, linkEl: a1 },
+      preferred
+    ).net;
+
+    net2 = renderBanner(
+      { titleEl: t2, whenEl: w2, countEl: c2, linkEl: a2 },
+      generic
+    ).net;
+	// Update notify button states automatically
+updateNotifyButtonState(net1?.getTime(), document.getElementById("notify1"));
+updateNotifyButtonState(net2?.getTime(), document.getElementById("notify2"));
+
+
+    // Expose launch times (ms) for Notify buttons
+    window.__mcNextNetMs  = net1 ? net1.getTime()  : null;
+    window.__mcNext2NetMs = net2 ? net2.getTime() : null;
+
+    // --- Auto-reset Notify button labels when launch changes ---
+    if (typeof notificationState === 'object') {
+      if (notifyBtn && window.__mcNextNetMs !== window.__mcPrevNetMs) {
+        notifyBtn.textContent = 'Notify T−10m';
+        notificationState.btn1 = false;
+        window.__mcNotifiedMs1 = null;
+      }
+
+      if (notifyBtn2 && window.__mcNext2NetMs !== window.__mcPrevNet2Ms) {
+        notifyBtn2.textContent = 'Notify T−10m';
+        notificationState.btn2 = false;
+        window.__mcNotifiedMs2 = null;
+      }
+    }
+
+    // Remember these NETs for next refresh
+    window.__mcPrevNetMs  = window.__mcNextNetMs;
+    window.__mcPrevNet2Ms = window.__mcNext2NetMs;
+  } catch (err) {
+  console.warn('Launch fetch failed:', err);
+
+  const cached = readLaunchCache();
+  if (cached) {
+    const primary   = hydrateCached(cached.primary);
+    const secondary = hydrateCached(cached.secondary);
+
+    net1 = renderBanner(
+      { titleEl: t1, whenEl: w1, countEl: c1, linkEl: a1 },
+      primary
+    ).net;
+
+    net2 = renderBanner(
+      { titleEl: t2, whenEl: w2, countEl: c2, linkEl: a2 },
+      secondary
+    ).net;
+
+    window.__mcNextNetMs  = net1 ? net1.getTime()  : null;
+    window.__mcNext2NetMs = net2 ? net2.getTime() : null;
+
+    // ⭐ DATA STREAM: CACHED or STALE (only if helper exists)
+    if (typeof window.setDataStatus === 'function') {
+      const age = Date.now() - cached.ts;
+      if (age > 3 * 60 * 60 * 1000) {
+        window.setDataStatus('stale');
+      } else {
+        window.setDataStatus('cached');
+      }
+    }
+
+  } else {
+    renderEmpty();
+    // ⭐ DATA STREAM: OFFLINE (only if helper exists)
+    if (typeof window.setDataStatus === 'function') {
+      window.setDataStatus('offline');
+    }
+    return;
+  }
+}
+
+
+
+  // Wire up countdowns (even from cache/fallback)
+  
+}
+
+
+
+            // ---- Overrides modal wiring ----
+    const openBtn  = document.getElementById('openOverrides');
+    const modal    = document.getElementById('overridesModal');
+    const closeBtn = document.getElementById('closeOverrides');
+    const saveBtn  = document.getElementById('saveAndClose');
+    const delAll   = document.getElementById('deleteAllOverrides');
+    const exportBtn= document.getElementById('exportOverrides');
+    const importInp= document.getElementById('importOverrides');
+    const listEl   = document.getElementById('overridesList');
+
+    const inp = {
+      name:     document.getElementById('ovName'),
+      net:      document.getElementById('ovNet'),
+      url:      document.getElementById('ovUrl'),
+      provider: document.getElementById('ovProvider'),
+      rocket:   document.getElementById('ovRocket'),
+      mission:  document.getElementById('ovMission'),
+      boost:    document.getElementById('ovBoost'),
+      force:    document.getElementById('ovForce')
+    };
+
+    function clearForm(){
+      if (!inp.name) return;
+      inp.name.value     = '';
+      inp.net.value      = '';
+      inp.url.value      = '';
+      inp.provider.value = '';
+      inp.rocket.value   = '';
+      inp.mission.value  = '';
+      inp.boost.value    = '0';
+      inp.force.checked  = false;
+    }
+
+    function renderList(){
+      if (!listEl) return;
+      if (!manualOverrides.length) {
+        listEl.innerHTML =
+          '<div class="mc-item"><div class="mc-item__meta">No overrides yet. Add one above.</div></div>';
+        return;
+      }
+      listEl.innerHTML = manualOverrides.map((o, idx) => {
+        const when = new Date(o.net); const bad = isNaN(+when);
+        return `
+          <div class="mc-item">
+            <div class="mc-item__top">
+              <div>
+                <div class="mc-item__title">
+                  ${o.name || '(no name)'}
+                  ${o.forcePrimary ? '• <span style="color:#38bdf8">Force primary</span>' : ''}
+                </div>
+                <div class="mc-item__meta">
+                  NET: ${bad ? '<span style="color:#fda4af">Invalid date</span>' : when.toLocaleString()}
+                  · Provider: ${o.provider || '-'} · Boost: ${o.priorityBoost||0}
+                </div>
+                ${o.url ? `<div class="mc-item__meta"><a href="${o.url}"
+                          target="_blank" rel="noopener">${o.url}</a></div>` : ''}
+              </div>
+              <div class="mc-item__btns">
+                <button class="mc-btn mc-btn--ghost" data-edit="${idx}">Edit</button>
+                <button class="mc-btn mc-btn--danger" data-del="${idx}">Delete</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function gatherForm(){
+      return {
+        name:          (inp.name?.value     || '').trim(),
+        net:           (inp.net?.value      || '').trim(),
+        url:           (inp.url?.value      || '').trim(),
+        provider:      (inp.provider?.value || '').trim(),
+        rocket:        (inp.rocket?.value   || '').trim(),
+        mission:       (inp.mission?.value  || '').trim(),
+        priorityBoost: Number(inp.boost?.value || 0),
+        forcePrimary:  !!inp.force?.checked
+      };
+    }
+
+    function openModal(){
+      if (!modal) return;
+      modal.classList.remove('hidden');
+      void modal.offsetWidth;
+      modal.classList.add('show');
+      modal.setAttribute('aria-hidden','false');
+      renderList();
+
+      // Open blip
+      try{
+        const hoverSound = document.getElementById('hoverSound');
+        if (hoverSound){
+          hoverSound.currentTime = 0;
+          hoverSound.volume = Number(localStorage.getItem('mc.sfxVol') ?? 0.7);
+          hoverSound.play().catch(()=>{});
+        }
+      }catch{}
+    }
+
+    function closeModal(){
+      if (!modal) return;
+      modal.classList.remove('show');
+      modal.setAttribute('aria-hidden','true');
+      // Close blip (soft)
+      try{
+        const hoverSound = document.getElementById('hoverSound');
+        if (hoverSound){
+          hoverSound.pause();
+          hoverSound.currentTime = 0;
+          hoverSound.volume = Math.max(
+            0,
+            Number(localStorage.getItem('mc.sfxVol') ?? 0.7) * 0.7
+          );
+          hoverSound.playbackRate = 0.9;
+          hoverSound.play().catch(()=>{});
+          setTimeout(()=>{ hoverSound.playbackRate = 1.0; }, 400);
+        }
+      }catch{}
+      setTimeout(()=>{ modal.classList.add('hidden'); clearForm(); }, 250);
+    }
+
+    // Add override
+    const addBtn   = document.getElementById('addOverride');
+    const clrBtn   = document.getElementById('clearForm');
+
+    if (addBtn) {
+      addBtn.addEventListener('click', () => {
+        const o = gatherForm();
+        if (!o.name || !o.net){
+          alert('Name and NET are required (ISO e.g. 2025-11-20T13:00:00-06:00)');
+          return;
+        }
+        const d = new Date(o.net);
+        if (isNaN(+d)){
+          alert('NET is invalid. Include timezone like -06:00 or use Z for UTC.');
+          return;
+        }
+
+        const key = (x) => (x.name||'')+'|'+(x.net||'');
+        const idx = manualOverrides.findIndex(x => key(x) === key(o));
+        if (idx >= 0) manualOverrides[idx] = o; else manualOverrides.push(o);
+
+        setOverrides(manualOverrides);
+        renderList();
+        updateBoth();
+      });
+    }
+
+    if (clrBtn) {
+      clrBtn.addEventListener('click', clearForm);
+    }
+
+    if (listEl) {
+      listEl.addEventListener('click', (e) => {
+        const t   = e.target;
+        const del = t.getAttribute('data-del');
+        const edit= t.getAttribute('data-edit');
+
+        if (del !== null){
+          manualOverrides.splice(Number(del),1);
+          setOverrides(manualOverrides);
+          renderList();
+          updateBoth();
+        } else if (edit !== null){
+          const o = manualOverrides[Number(edit)];
+          if (!o) return;
+          if (inp.name)     inp.name.value     = o.name    || '';
+          if (inp.net)      inp.net.value      = o.net     || '';
+          if (inp.url)      inp.url.value      = o.url     || '';
+          if (inp.provider) inp.provider.value = o.provider|| '';
+          if (inp.rocket)   inp.rocket.value   = o.rocket  || '';
+          if (inp.mission)  inp.mission.value  = o.mission || '';
+          if (inp.boost)    inp.boost.value    = o.priorityBoost || 0;
+          if (inp.force)    inp.force.checked  = !!o.forcePrimary;
+        }
+      });
+    }
+
+    // Delete all overrides
+    if (delAll) {
+      delAll.addEventListener('click', () => {
+        if (!confirm('Delete ALL overrides?')) return;
+        manualOverrides = [];
+        setOverrides(manualOverrides);
+        renderList();
+        updateBoth();
+      });
+    }
+
+    // Export overrides JSON
+    if (exportBtn) {
+      exportBtn.addEventListener('click', () => {
+        const blob = new Blob(
+          [JSON.stringify(manualOverrides, null, 2)],
+          { type: 'application/json' }
+        );
+        const url = URL.createObjectURL(blob);
+        const a   = document.createElement('a');
+        a.href = url;
+        a.download = 'mission-control-overrides.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+    }
+
+    // Import overrides JSON
+    if (importInp) {
+      importInp.addEventListener('change', (e) => {
+        const f = e.target.files && e.target.files[0];
+        if (!f) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            const incoming = JSON.parse(reader.result);
+            if (!Array.isArray(incoming)) {
+              throw new Error('JSON must be an array');
+            }
+            manualOverrides = incoming;
+            setOverrides(manualOverrides);
+            renderList();
+            updateBoth();
+          } catch (err) {
+            alert('Invalid JSON: ' + err.message);
+          }
+        };
+        reader.readAsText(f);
+        e.target.value = '';
+      });
+    }
+
+    // Optional header button to open modal
+    if (openBtn) {
+      openBtn.addEventListener('click', openModal);
+    }
+
+    // Backdrop + close buttons
+    const modalBackdropEl = document.querySelector('.mc-modal__backdrop');
+    if (modalBackdropEl) {
+      modalBackdropEl.addEventListener('click', closeModal);
+    }
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeModal);
+    }
+    if (saveBtn) {
+      saveBtn.addEventListener('click', closeModal);
+    }
+
+    // Start
+
+
+
+       // Start
+
+    // 1) Try to paint from cache for instant UI
+    const cached = readLaunchCache();
+    if (cached) {
+      const primary   = hydrateCached(cached.primary);
+      const secondary = hydrateCached(cached.secondary);
+
+      net1 = renderBanner({titleEl:t1, whenEl:w1, countEl:c1, linkEl:a1}, primary).net;
+      net2 = renderBanner({titleEl:t2, whenEl:w2, countEl:c2, linkEl:a2}, secondary).net;
+
+      window.__mcNextNetMs  = net1 ? net1.getTime()  : null;
+      window.__mcNext2NetMs = net2 ? net2.getTime() : null;
+    }
+
+       // 1b) Update timestamp from cache if present
+if (cached && cached.ts) {
+  const tsEl = document.getElementById('launchLastUpdated');
+  if (tsEl) {
+    tsEl.textContent = `Last updated: ${fmtTs(cached.ts)} (cached)`;
+    if (typeof pulseMissionTitle === 'function') {
+      pulseMissionTitle();
+    }
+  }
+
+  // optional: show CACHED immediately if helper exists
+  if (typeof window.setDataStatus === 'function') {
+    window.setDataStatus('cached');
+  }
+}
+
+
+
+    // 2) Then refresh from the live API in the background
+    updateBoth();
+
+    // 3) Per-second countdown tickers
+    startTicker(() => net1, c1);
+    startTicker(() => net2, c2);
+
+    // 4) Periodic refresh every 10 minutes
+    setInterval(updateBoth, 10 * 60 * 1000);
+  })();
+</script>
+
+
+ 
+  <!-- Power-on, audio + UI polish -->
+  <script>
+  (function () {
+    const body = document.body;
+    const wrapper = document.querySelector('.wrapper');
+    const overlay = document.getElementById('powerOn');
+    const btn = document.getElementById('powerOnBtn');
+
+    const hoverSound = document.getElementById('hoverSound');
+    const startupHum = document.getElementById('startupHum');
+    const ambientHum = document.getElementById('ambientHum');
+
+    const cards = document.querySelectorAll('.card');
+    let hoverEnabled = false;
+    let lastHoverAt = 0;
+
+    // Fade helper
+    let ambientFadeRAF = null;
+    function fadeToAudio(audio, to, ms){
+      if (!audio) return;
+      if (ambientFadeRAF) cancelAnimationFrame(ambientFadeRAF);
+      const from = audio.volume ?? 0;
+      const start = performance.now();
+      const dur = Math.max(1, ms|0);
+      function step(now){
+        const t = Math.min(1, (now - start) / dur);
+        audio.volume = from + (to - from) * t;
+        if (t < 1) ambientFadeRAF = requestAnimationFrame(step);
+      }
+      ambientFadeRAF = requestAnimationFrame(step);
+    }
+let cachedSfxVol = Number(localStorage.getItem('mc.sfxVol') ?? 0.7);
+const calcAmbientTarget = () => Math.min(cachedSfxVol * 0.2, 0.08);
+    // Prime liftoff for instant play later
+    if (startupHum){
+      try{
+        startupHum.load(); startupHum.muted = true;
+        const p = startupHum.play();
+        if (p && p.then){ p.then(()=>{ startupHum.pause(); startupHum.currentTime=0; }).catch(()=>{}).finally(()=>{ startupHum.muted=false; }); }
+        else { startupHum.pause(); startupHum.currentTime=0; startupHum.muted=false; }
+      }catch{ startupHum.muted=false; }
+    }
+
+   // Card hover FX + blip
+if (cards.length && hoverSound) {
+  hoverSound.volume = cachedSfxVol;
+  const powerupTimeouts = new WeakMap();
+  cards.forEach(card => {
+    card.addEventListener('mouseenter', () => {
+      const now = performance.now();
+      if (now - lastHoverAt < 120) return;
+      lastHoverAt = now;
+      if (powerupTimeouts.has(card)) return; // Already animating
+      powerupTimeouts.set(card, true);
+      card.classList.add('powerup');
+      if (!hoverEnabled) return;
+      hoverSound.currentTime = 0; hoverSound.play().catch(()=>{});
+    });
+    card.addEventListener('animationend', (e) => {
+      if (e.animationName === 'powerup-flash') {
+        card.classList.remove('powerup');
+        powerupTimeouts.delete(card);
+      }
+    });
+  });
+}
+
+    // Sticky header
+(function(){
+  const hdr = document.querySelector('header');
+  if (!hdr) return;
+  let ticking = false;
+  const onScroll = () => {
+    if (!ticking) {
+      window.requestAnimationFrame(() => {
+        hdr.classList.toggle('stuck', (window.scrollY || document.documentElement.scrollTop) > 8);
+        ticking = false;
+      });
+      ticking = true;
+    }
+  };
+  onScroll(); window.addEventListener('scroll', onScroll, { passive:true });
+})();
+
+    // Compact grid toggle
+    (function(){
+      const grid = document.querySelector('.grid'); if (!grid) return;
+      const key = 'mc.compact';
+      function apply(on){ grid.classList.toggle('compact', !!on); }
+      apply(localStorage.getItem(key) === '1');
+      const cbtn = document.getElementById('compactToggle');
+      if (cbtn){
+        const initPressed = localStorage.getItem(key) === '1';
+        cbtn.setAttribute('aria-pressed', initPressed ? 'true' : 'false');
+        cbtn.addEventListener('click', () => {
+          const on = !(localStorage.getItem(key) === '1');
+          localStorage.setItem(key, on ? '1' : '0');
+          cbtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+          apply(on);
+        });
+      }
+    })();
+
+    // Button ripple (pill + visit)
+    function attachBtnRipple(el){
+      if (!el) return;
+      el.addEventListener('pointerdown', (e) => {
+        const r = el.getBoundingClientRect();
+        const x = (e.clientX ?? (r.left + r.width/2)) - r.left;
+        const y = (e.clientY ?? (r.top  + r.height/2)) - r.top;
+        el.style.setProperty('--rx', x + 'px');
+        el.style.setProperty('--ry', y + 'px');
+        el.classList.remove('btn-wave'); void el.offsetWidth; el.classList.add('btn-wave');
+        el.classList.add('pulse-press');
+        setTimeout(()=> el.classList.remove('pulse-press'), 400);
+        el.addEventListener('animationend', ()=> el.classList.remove('btn-wave'), { once:true });
+      }, { passive:true });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+['#compactToggle', '#clockToggle', '#ambientToggle', '#nlLink', '#nl2Link', '#openOverrides', '#testLiftoff', '#notifyBtn', '#notifyBtn2']
+        .forEach(sel => attachBtnRipple(document.querySelector(sel)));
+    });
+
+    // --- Hover blip on all header pills + details links ---
+function attachHoverBlip(el){
+  if (!el || !hoverSound) return;
+  el.addEventListener('mouseenter', () => {
+    if (!hoverEnabled) return;
+    hoverSound.currentTime = 0;
+    hoverSound.play().catch(()=>{});
+  });
+}
+
+// Add to these controls
+[
+  '#compactToggle',
+  '#clockToggle',
+  '#ambientToggle',
+  '#openOverrides',
+  '#testLiftoff',
+  '#nlLink',
+  '#nl2Link',
+  '#notifyBtn',
+  '#notifyBtn2'
+].forEach(sel => attachHoverBlip(document.querySelector(sel)));
+
+
+    if (btn) {
+      const launch = (e) => {
+        e.preventDefault();
+        btn.removeEventListener('pointerdown', launch);
+
+        // Liftoff SFX
+        if (startupHum){
+          startupHum.volume = Number(localStorage.getItem('mc.sfxVol') ?? 0.7);
+          startupHum.currentTime = 0; startupHum.play().catch(()=>{});
+        }
+       // Ambient: keep muted by default; user can enable it later with the toggle
+if (ambientHum){
+  ambientHum.muted = true;
+  ambientHum.volume = 0;
+  ambientHum.currentTime = 0;
+  // we do NOT auto-play here
+}
+
+
+        // Visuals
+        overlay.classList.add('hide'); setTimeout(()=> overlay.remove(), 350);
+        wrapper.classList.add('ready');
+        body.classList.add('startup-flash'); setTimeout(()=> body.classList.remove('startup-flash'), 1200);
+
+        window.mcPoweredOn = true; hoverEnabled = true;
+
+        // Ambient toggle
+const ambientToggle = document.getElementById('ambientToggle');
+if (ambientToggle && ambientHum){
+  // start MUTED by default
+  let ambientMuted = true;
+  ambientHum.muted  = true;
+  ambientHum.volume = 0;
+
+  // reflect that in the button
+  ambientToggle.textContent = '🔈';          // "sound off" icon
+  ambientToggle.style.opacity = 0.4;
+  ambientToggle.setAttribute('aria-pressed', 'false');
+
+  ambientToggle.addEventListener('click', () => {
+    ambientMuted = !ambientMuted;
+
+    if (ambientMuted){
+      // fade out and then fully mute/pause
+      fadeToAudio(ambientHum, 0, 600);
+      setTimeout(() => {
+        ambientHum.pause();
+        ambientHum.muted = true;
+      }, 620);
+    } else {
+      // unmute + play and fade up to target
+      ambientHum.muted = false;
+      ambientHum.play().catch(()=>{});
+      fadeToAudio(ambientHum, calcAmbientTarget(), 900);
+    }
+
+    ambientToggle.textContent = ambientMuted ? '🔈' : '🔇';
+    ambientToggle.style.opacity = ambientMuted ? 0.4 : 0.65;
+    ambientToggle.setAttribute('aria-pressed', String(!ambientMuted));
+  });
+}
+
+      };
+      btn.addEventListener('pointerdown', launch);
+    }
+  })();
+  </script>
+
+  <!-- Volume + Test Liftoff -->
+<script>
+(function () {
+  const volSlider   = document.getElementById('sfxVol');
+  const testButton  = document.getElementById('testLiftoff');
+  const hoverSound  = document.getElementById('hoverSound');
+  const liftoffSound = document.getElementById('startupHum');
+
+  const KEY = 'mc.sfxVol';
+
+  function getStoredVol() {
+    const raw = parseFloat(localStorage.getItem(KEY));
+    if (isNaN(raw)) return 0.35;
+    return Math.min(1, Math.max(0, raw));
+  }
+
+  function applyVolume(v) {
+    if (hoverSound)   hoverSound.volume   = v;
+    if (liftoffSound) liftoffSound.volume = v;
+    localStorage.setItem(KEY, String(v));
+
+    if (volSlider && !volSlider.classList.contains('pulse')) {
+      volSlider.classList.add('pulse');
+      setTimeout(() => volSlider.classList.remove('pulse'), 350);
+    }
+  }
+
+  const initial = getStoredVol();
+  applyVolume(initial);
+
+  if (volSlider) {
+    volSlider.value = initial;
+    volSlider.addEventListener('input', () => {
+      const v = parseFloat(volSlider.value || '0.35') || 0.35;
+      applyVolume(v);
+    });
+  }
+
+  if (testButton && liftoffSound) {
+    testButton.addEventListener('click', () => {
+      try {
+        liftoffSound.currentTime = 0;
+        liftoffSound.play().catch(() => {});
+      } catch (_) {}
+    });
+  }
+})();
+</script>
+<!-- Mission Social Feed (RSS tabs, via Render proxy + cache + blocklist) -->
+<script>
+(function () {
+  // --- Config -------------------------------------------------------------
+
+  const PROXY_BASE = 'https://mission-control-rss-proxy.onrender.com/rss?url=';
+
+     const FEED_RSS = {
+  // SpaceX news
+  spacex: PROXY_BASE + encodeURIComponent(
+    'https://www.teslarati.com/category/spacex/feed/'
+  ),
+
+  // Elon-focused updates
+  elon: PROXY_BASE + encodeURIComponent(
+    'https://www.teslarati.com/tag/elon-musk/feed/'
+  ),
+
+  // Pure launch activity from Spaceflight Now
+  launches: PROXY_BASE + encodeURIComponent(
+    'https://spaceflightnow.com/feed/'
+  )
+};
+
+
+
+  const FEED_LABEL = {
+    spacex:   'SpaceX',
+    elon:     'Elon Musk',
+    launches: 'Launch notices'
+  };
+
+  const MAX_ITEMS      = 8;
+  const FEED_CACHE_TTL = 10 * 60 * 1000;  // 10 minutes
+  const FEED_STALE_MS  = 60 * 60 * 1000;  // 1 hour
+  const FEED_BLOCK_KEY = 'feed.blocklist';
+
+  // --- Small helpers ------------------------------------------------------
+
+  function niceDate(raw) {
+    if (!raw) return '';
+    const d = new Date(raw);
+    if (isNaN(+d)) return raw;
+    return d.toLocaleString('en-US', {
+      month: 'short',
+      day:   'numeric',
+      hour:  '2-digit',
+      minute:'2-digit',
+      timeZoneName: 'short'
+    });
+  }
+
+  function $(sel) {
+    return document.querySelector(sel);
+  }
+
+  function $all(sel) {
+    return Array.from(document.querySelectorAll(sel));
+  }
+
+  function readBlocklist() {
+    try {
+      const raw = localStorage.getItem(FEED_BLOCK_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function saveBlocklist(list) {
+    try {
+      localStorage.setItem(FEED_BLOCK_KEY, JSON.stringify(list));
+    } catch {}
+  }
+
+  function applyBlocklist(items, blocklist) {
+    if (!blocklist || !blocklist.length) return items;
+    const needles = blocklist.map(s => s.toLowerCase());
+    return items.filter(item => {
+      const title   = (item.title   || '');
+      const summary = (item.summary || '');
+      const url     = (item.url     || '');
+      const hay = (title + ' ' + summary + ' ' + url).toLowerCase();
+      return !needles.some(n => hay.includes(n));
+    });
+  }
+
+  function cleanSummary(summary) {
+    if (!summary) return '';
+    let s = summary;
+    s = s.replace(/<!--[\s\S]*?-->/g, ' ');
+    s = s.replace(/<[^>]+>/g, ' ');
+    s = s.replace(/\s+/g, ' ').trim();
+    const txt = document.createElement('textarea');
+    txt.innerHTML = s;
+    return txt.value.trim();
+  }
+
+  function getSource(item) {
+    if (item.source) return item.source;
+
+    try {
+      if (item.url) {
+        const host = new URL(item.url).hostname.replace(/^www\./, '');
+        if (host.includes('nasaspaceflight')) return 'NASASpaceflight';
+        if (host.includes('teslarati'))       return 'Teslarati';
+        if (host.includes('spacenews'))       return 'SpaceNews';
+        return host;
+      }
+    } catch (e) {}
+
+    if (item.summary) {
+      const m = item.summary.match(/[-–—]\s*([^-\u2013\u2014]+)$/);
+      if (m) return m[1].trim();
+    }
+
+    return '';
+  }
+
+  // --- Feed parsers -------------------------------------------------------
+
+  function parseAtom(xmlText) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'text/xml');
+    const feed = doc.querySelector('feed');
+    if (!feed) return { updated: null, items: [] };
+
+    const updated =
+      feed.querySelector('updated')?.textContent ||
+      feed.querySelector('modified')?.textContent ||
+      null;
+
+    const entries = Array.from(feed.getElementsByTagName('entry'));
+    const items = entries.map(entry => {
+      const title = entry.getElementsByTagName('title')[0]?.textContent || '(no title)';
+
+      let linkNode = Array.from(entry.getElementsByTagName('link'))
+        .find(l => l.getAttribute('rel') === 'alternate');
+      if (!linkNode) {
+        linkNode = entry.getElementsByTagName('link')[0] || null;
+      }
+      const url = linkNode ? (linkNode.getAttribute('href') || '#') : '#';
+
+      const date =
+        entry.getElementsByTagName('updated')[0]?.textContent ||
+        entry.getElementsByTagName('published')[0]?.textContent ||
+        '';
+
+      const contentNode =
+        entry.getElementsByTagName('content')[0] ||
+        entry.getElementsByTagName('summary')[0] ||
+        null;
+      const summary = contentNode ? (contentNode.textContent || '') : '';
+
+      return { title, url, date, summary };
+    });
+
+    return { updated, items };
+  }
+
+  function parseRss(xmlText) {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(xmlText, 'text/xml');
+    const channel = doc.querySelector('rss > channel');
+    if (!channel) return { updated: null, items: [] };
+
+    const updated =
+      channel.querySelector('lastBuildDate')?.textContent ||
+      channel.querySelector('pubDate')?.textContent ||
+      null;
+
+    const entries = Array.from(channel.getElementsByTagName('item'));
+    const items = entries.map(item => {
+      const title = item.getElementsByTagName('title')[0]?.textContent || '(no title)';
+      const url   = item.getElementsByTagName('link')[0]?.textContent || '#';
+      const date  =
+        item.getElementsByTagName('pubDate')[0]?.textContent ||
+        item.getElementsByTagName('updated')[0]?.textContent ||
+        '';
+
+      const contentNode =
+        item.getElementsByTagName('description')[0] ||
+        item.getElementsByTagName('content')[0] ||
+        item.getElementsByTagName('summary')[0] ||
+        null;
+      const summary = contentNode ? (contentNode.textContent || '') : '';
+
+      return { title, url, date, summary };
+    });
+
+    return { updated, items };
+  }
+
+  function parseFeed(xmlText) {
+    const doc = new DOMParser().parseFromString(xmlText, 'text/xml');
+    if (doc.querySelector('feed')) return parseAtom(xmlText);
+    if (doc.querySelector('rss'))  return parseRss(xmlText);
+    return { updated: null, items: [] };
+  }
+
+  // --- Cache --------------------------------------------------------------
+
+  const memoryCache = {}; // feedKey -> { ts, updated, items }
+
+  function getCache(feedKey) {
+    const c = memoryCache[feedKey];
+    if (!c) return null;
+    if (Date.now() - c.ts > FEED_CACHE_TTL) return null;
+    return c;
+  }
+
+  function setCache(feedKey, payload) {
+    memoryCache[feedKey] = {
+      ts: Date.now(),
+      updated: payload.updated || null,
+      items: payload.items || []
+    };
+  }
+
+  // --- DOM wiring ---------------------------------------------------------
+
+  const listEl        = $('#missionFeedList');
+  const updatedLabel  = $('#feedUpdatedLabel');
+  const tabs          = $all('.mission-feed-tab');
+  const filterBtn     = $('#missionFeedFilter');
+  const refreshBtn    = $('#missionFeedRefresh');
+  const filterPanel   = $('#feedBlockPanel');
+  const blockInput    = $('#feedBlockInput');
+  const blockAddBtn   = $('#feedBlockAdd');
+  const blockClearBtn = $('#feedBlockClear');
+  const blockListEl   = $('#feedBlockList');
+
+  if (!listEl || !updatedLabel || !tabs.length) {
+    console.warn('[MissionFeed] missing DOM, aborting');
+    return;
+  }
+
+  let currentFeed = 'spacex';
+  let blocklist   = readBlocklist();
+
+  function setUpdatedLabel(ts) {
+    if (!ts) {
+      updatedLabel.textContent = 'Last updated: —';
+      updatedLabel.classList.remove('stale');
+      return;
+    }
+    updatedLabel.textContent = 'Last updated: ' + niceDate(ts);
+    if (Date.now() - ts > FEED_STALE_MS) {
+      updatedLabel.classList.add('stale');
+    } else {
+      updatedLabel.classList.remove('stale');
+    }
+  }
+
+  function renderSkeleton() {
+    // Optional: leave existing skeleton markup alone.
+    // If you want, you could inject lightweight placeholders here.
+  }
+function renderItems(feedKey, payload) {
+  const { updated, items } = payload; // you can leave `updated` there or remove it
+  const filtered = applyBlocklist(items, blocklist).slice(0, MAX_ITEMS);
+
+  listEl.innerHTML = '';
+
+  if (!filtered.length) {
+    const empty = document.createElement('div');
+    empty.className = 'feed-empty';
+    empty.textContent = `Unable to load ${FEED_LABEL[feedKey] || 'feed'} right now.`;
+    listEl.appendChild(empty);
+
+    // Show "last checked" as now, even if feed is empty
+    setUpdatedLabel(Date.now());
+    return;
+  }
+
+  filtered.forEach(item => {
+    const article = document.createElement('article');
+    article.className = 'feed-item';
+
+    const header = document.createElement('div');
+    header.className = 'feed-header';
+
+    const pill = document.createElement('span');
+    pill.className = 'feed-pill';
+    pill.textContent = FEED_LABEL[feedKey] || 'Feed';
+
+    const time = document.createElement('span');
+    time.className = 'feed-time';
+    time.textContent = item.date ? niceDate(item.date) : '';
+
+    header.appendChild(pill);
+    header.appendChild(time);
+
+    const titleLink = document.createElement('a');
+    titleLink.className = 'feed-title';
+    titleLink.href = item.url || '#';
+    titleLink.target = '_blank';
+    titleLink.rel = 'noopener noreferrer';
+    titleLink.textContent = item.title || '(no title)';
+
+    const meta = document.createElement('p');
+    meta.className = 'feed-body';
+    const source  = getSource(item);
+    const dateStr = item.date ? niceDate(item.date) : '';
+
+    if (source && dateStr) {
+      meta.textContent = `${source} — ${dateStr}`;
+    } else if (source) {
+      meta.textContent = source;
+    } else if (dateStr) {
+      meta.textContent = dateStr;
+    } else {
+      meta.textContent = '';
+    }
+
+    article.appendChild(header);
+    article.appendChild(titleLink);
+    if (meta.textContent) {
+      article.appendChild(meta);
+    }
+
+    listEl.appendChild(article);
+  });
+
+  // "Last updated" = when Mission Control fetched, not feed's own timestamp
+  setUpdatedLabel(Date.now());
+}
+
+  async function fetchFeed(feedKey, { force } = {}) {
+    try {
+      const cached = !force && getCache(feedKey);
+      if (cached) {
+        renderItems(feedKey, cached);
+        return;
+      }
+
+      renderSkeleton();
+
+      const url = FEED_RSS[feedKey];
+      if (!url) throw new Error('Unknown feed ' + feedKey);
+
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+
+      const parsed = parseFeed(text);
+      setCache(feedKey, parsed);
+      renderItems(feedKey, parsed);
+    } catch (err) {
+      console.warn('[MissionFeed] failed', err);
+      listEl.innerHTML = '';
+      const div = document.createElement('div');
+      div.className = 'feed-empty';
+      div.textContent = `Unable to load ${FEED_LABEL[feedKey] || 'feed'} right now.`;
+      listEl.appendChild(div);
+      setUpdatedLabel(null);
+    }
+  }
+
+  function setActiveTab(feedKey) {
+    tabs.forEach(btn => {
+      const key = btn.getAttribute('data-feed');
+      if (key === feedKey) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+  }
+
+  function blockPanelVisible(show) {
+    filterPanel.hidden = !show;
+  }
+
+  function renderBlocklistChips() {
+    blockListEl.innerHTML = '';
+    if (!blocklist.length) {
+      const empty = document.createElement('div');
+      empty.className = 'feed-filter-empty';
+      empty.textContent = 'No filters active.';
+      blockListEl.appendChild(empty);
+      filterBtn.classList.remove('active');
+      filterPanel.hidden = true;
+      return;
+    }
+
+    filterBtn.classList.add('active');
+
+    blocklist.forEach((word, idx) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'feed-filter-chip';
+      chip.textContent = word;
+      chip.addEventListener('click', () => {
+        blocklist.splice(idx, 1);
+        saveBlocklist(blocklist);
+        renderBlocklistChips();
+        fetchFeed(currentFeed);
+      });
+      blockListEl.appendChild(chip);
+    });
+
+    blockPanelVisible(true);
+  }
+
+  function addBlockFromInput() {
+    const raw = (blockInput.value || '').trim();
+    if (!raw) return;
+    if (!blocklist.includes(raw)) {
+      blocklist.push(raw);
+      saveBlocklist(blocklist);
+      renderBlocklistChips();
+      fetchFeed(currentFeed);
+    }
+    blockInput.value = '';
+    blockInput.focus();
+  }
+
+  // --- Event wiring -------------------------------------------------------
+
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.getAttribute('data-feed');
+      if (!key || key === currentFeed) return;
+      currentFeed = key;
+      setActiveTab(currentFeed);
+      fetchFeed(currentFeed);
+    });
+  });
+
+  if (filterBtn) {
+    filterBtn.addEventListener('click', () => {
+      const nowHidden = !filterPanel.hidden;
+      blockPanelVisible(!nowHidden);
+    });
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', () => {
+      fetchFeed(currentFeed, { force: true });
+    });
+  }
+
+  if (blockAddBtn) {
+    blockAddBtn.addEventListener('click', addBlockFromInput);
+  }
+
+  if (blockInput) {
+    blockInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addBlockFromInput();
+      }
+    });
+  }
+
+  if (blockClearBtn) {
+    blockClearBtn.addEventListener('click', () => {
+      blocklist = [];
+      saveBlocklist(blocklist);
+      renderBlocklistChips();
+      fetchFeed(currentFeed);
+    });
+  }
+
+  // --- Initial load -------------------------------------------------------
+
+  setActiveTab(currentFeed);
+  renderBlocklistChips();
+  fetchFeed(currentFeed);
+})();
+</script>
+
+<script>
+// === Mission Control Notification Helpers ===
+
+// Ask for / verify permission in a safe, cross-platform way
+async function ensureNotifyPermission() {
+  // 1) Browser doesn’t support the API at all
+  if (!("Notification" in window)) {
+    console.warn("[MC] Notifications API not available in this browser.");
+    return false;
+  }
+
+  // 2) Already allowed
+  if (Notification.permission === "granted") {
+    return true;
+  }
+
+  // 3) Explicitly denied in browser/OS settings
+  if (Notification.permission === "denied") {
+    console.warn("[MC] Notifications permission was previously denied.");
+    return false;
+  }
+
+  // 4) "default" → ask the user now
+  try {
+    const result = await Notification.requestPermission();
+    if (result !== "granted") {
+      console.warn("[MC] Notification permission request not granted:", result);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.warn("[MC] Notification.requestPermission() failed:", err);
+    return false;
+  }
+}
+
+// Fire a notification and reuse your hover SFX for the chime
+function showMissionNotification(title, message) {
+  try {
+    const icon = "./icons/icon-192.png";
+
+    new Notification(title, {
+      body: message,
+      icon,
+      badge: icon,
+      requireInteraction: true,
+      tag: "mission-alert"
+    });
+
+    const blip = document.getElementById("hoverSound");
+    if (blip) {
+      blip.currentTime = 0;
+
+      const stored = localStorage.getItem("mc.sfxVol");
+      let vol = stored == null ? 0.7 : Number(stored);
+      if (Number.isNaN(vol)) vol = 0.7;
+
+      blip.volume = Math.min(1, Math.max(0, vol));
+      blip.play().catch(() => {});
+    }
+  } catch (err) {
+    console.warn("[MC] Notification failed:", err);
+  }
+}
+
+// Separate timers for primary + secondary launch notifications
+window._mcNotifyPrimary = null;
+window._mcNotifySecondary = null;
+
+/**
+ * whenMs:      launch NET time in ms
+ * slot:        "primary" | "secondary"
+ * label:       text for the notification body
+ */
+function scheduleLaunchNotify(whenMs, slot = "primary", label = "Next launch") {
+  const key = slot === "secondary" ? "_mcNotifySecondary" : "_mcNotifyPrimary";
+
+  // Clear any previous scheduled alert for this slot only
+  if (window[key]) clearTimeout(window[key]);
+
+  const fire = () =>
+    showMissionNotification("🚀 Mission Control", `${label}: T-10 minutes to liftoff!`);
+
+  // Time until T-10, in ms
+  const msUntilAlert = whenMs - Date.now() - 10 * 60 * 1000;
+
+  // If the value is bogus, don’t schedule anything
+  if (!Number.isFinite(msUntilAlert)) {
+    console.warn("[MC] scheduleLaunchNotify: invalid whenMs", whenMs);
+    return;
+  }
+
+  // If we’re already inside or past the T-10 window, don’t fire instantly
+  if (msUntilAlert <= 0) {
+    console.log("[MC] Launch already within T-10 window, not scheduling new notification.");
+    return;
+  }
+
+  // Normal case: schedule a one-shot timeout
+  window[key] = setTimeout(fire, msUntilAlert);
+}
+
+function cancelLaunchNotify(tag) {
+  if (!('serviceWorker' in navigator)) return;
+
+  navigator.serviceWorker.ready.then(reg => {
+    reg.getNotifications({ tag }).then(notifs => {
+      for (const n of notifs) n.close();
+    });
+  });
+}
+function updateNotifyButtonState(whenMs, btnEl) {
+  if (!btnEl) return;
+
+  const msToLaunch = whenMs - Date.now();
+  const msToTMinus10 = msToLaunch - 10 * 60 * 1000;
+
+  // If no valid time, just show default
+  if (!Number.isFinite(msToTMinus10)) {
+    btnEl.textContent = "Notify T−10m";
+    btnEl.disabled = false;
+    return;
+  }
+
+  if (msToTMinus10 <= 0) {
+    // Already inside the 10-minute window
+    btnEl.textContent = "Within T−10m";
+    btnEl.classList.add("disabled-notify");
+    btnEl.disabled = true;
+  } else {
+    // Not yet inside window
+    btnEl.textContent = "Notify T−10m";
+    btnEl.classList.remove("disabled-notify");
+    btnEl.disabled = false;
+  }
+}
+
+</script>
+
+
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .then(() => console.log('✅ SW registered'))
+    .catch(err => console.warn('SW failed:', err));
+}
+</script>
+
+<script>
+(function () {
+  const audioEl        = document.getElementById("radioAudio");
+  const playPauseBtn   = document.getElementById("radioPlayPause");
+  const stopBtn        = document.getElementById("radioStop");
+  const volumeSlider   = document.getElementById("radioVolume");
+  const nowPlayingEl   = document.getElementById("radioNowPlaying");
+  const stationsWrap   = document.getElementById("radioStations");
+  const stationButtons = stationsWrap ? stationsWrap.querySelectorAll(".radio-station") : [];
+  const vuEl           = document.getElementById("radioVu");
+
+  if (!audioEl || !playPauseBtn || !stopBtn || !volumeSlider || !nowPlayingEl || !stationsWrap) {
+    console.warn("[RADIO] Missing elements – radio init skipped.");
+    return;
+  }
+
+ // --- Stations ---
+const RADIO_STATIONS = {
+  station1: {
+    id: "station1",
+    name: "IHeart80s",
+    description: "iHeart – 80s",
+    streamUrl: "https://stream.revma.ihrhls.com/zc5060/hls.m3u8",
+    type: "hls"
+  },
+  station2: {
+    id: "station2",
+    name: "90s Country",
+    description: "181.fm – 90s Country",
+    streamUrl: "https://listen.181fm.com/181-90scountry_128k.mp3",
+    type: "direct"
+  },
+  station3: {
+    id: "station3",
+    name: "80s Rock",
+    description: "181.fm – The Eagle (80s Rock Hits)",
+    streamUrl: "https://listen.181fm.com/181-eagle_128k.mp3",
+    type: "direct"
+  }
+};
+
+// Default station
+let currentStationId = "station1";
+
+// Try to restore last-used station from MC settings
+try {
+  const savedStationId =
+    (typeof MC !== "undefined" && MC.get)
+      ? MC.get("radioStation", "station1")
+      : "station1";
+
+  if (RADIO_STATIONS[savedStationId]) {
+    currentStationId = savedStationId;
+  }
+} catch (e) {
+  console.warn("[RADIO] Failed to restore saved station:", e);
+}
+
+let isPlaying   = false;
+let hlsInstance = null;
+
+// remembers the last real “now playing” text so stop/play works nicely
+let lastNowPlayingText = "";
+
+
+  function getCurrentStation() {
+    return RADIO_STATIONS[currentStationId];
+  }
+
+  function setActiveStationButton(id) {
+    stationButtons.forEach(btn => {
+      const isActive = btn.dataset.station === id;
+      btn.classList.toggle("active", isActive);
+      if (isActive) {
+        const cfg = RADIO_STATIONS[id];
+        const nameEl = btn.querySelector(".station-name");
+        const descEl = btn.querySelector(".station-desc");
+        if (cfg && nameEl) nameEl.textContent = cfg.name;
+        if (cfg && descEl) descEl.textContent = cfg.description;
+      }
+    });
+  }
+
+  function updatePlayPauseIcon() {
+    playPauseBtn.textContent = isPlaying ? "⏸" : "▶";
+  }
+
+  function syncPlayingUI() {
+    const stationBtn = Array.from(stationButtons).find(
+      btn => btn.dataset.station === currentStationId
+    );
+    const isNowPlaying = isPlaying && !!audioEl.src;
+
+    if (stationBtn) {
+      stationBtn.classList.toggle("playing", isNowPlaying);
+    }
+    if (vuEl) {
+      vuEl.classList.toggle("playing", isNowPlaying);
+    }
+    updatePlayPauseIcon();
+  }
+
+  function destroyHls() {
+    if (hlsInstance) {
+      try { hlsInstance.destroy(); } catch (e) {}
+      hlsInstance = null;
+    }
+  }
+
+  function clearAudioElement() {
+    audioEl.pause();
+    audioEl.removeAttribute("src");
+    try { audioEl.load(); } catch (e) {}
+  }
+
+  function playAudio() {
+    audioEl
+      .play()
+      .then(() => {
+        isPlaying = true;
+        syncPlayingUI();
+
+        const station = getCurrentStation();
+        // If label still says "(stopped)" or "tuning…", restore something nicer
+        const txt = nowPlayingEl.textContent || "";
+        if (!txt || /\(stopped\)$/i.test(txt) || /tuning…$/i.test(txt)) {
+          if (lastNowPlayingText) {
+            nowPlayingEl.textContent = lastNowPlayingText;
+          } else if (station) {
+            nowPlayingEl.textContent = `${station.name} — live`;
+          }
+        }
+      })
+      .catch(err => {
+        console.warn("[RADIO] play() failed:", err);
+        isPlaying = false;
+        syncPlayingUI();
+      });
+  }
+
+  function attachStream(station, autoplay) {
+    if (!station) return;
+
+    destroyHls();
+    clearAudioElement();
+    isPlaying = false;
+    syncPlayingUI();
+
+    // new station = forget last label (we'll repopulate from metadata)
+    lastNowPlayingText = "";
+    nowPlayingEl.textContent = `${station.name} — tuning…`;
+
+    if (station.type === "hls" && window.Hls && window.Hls.isSupported()) {
+      hlsInstance = new Hls();
+      hlsInstance.loadSource(station.streamUrl);
+      hlsInstance.attachMedia(audioEl);
+
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (autoplay) playAudio();
+      });
+
+      hlsInstance.on(Hls.Events.FRAG_PARSING_METADATA, (event, data) => {
+        if (!data || !data.samples) return;
+        data.samples.forEach(sample => {
+          try {
+            const raw = new TextDecoder().decode(sample.data).replace(/\0/g, "").trim();
+            if (!raw) return;
+
+            const st = raw.match(/StreamTitle='([^']*)'/i);
+            if (st && st[1]) {
+              const v = st[1].trim();
+              if (v && v !== "-") {
+                lastNowPlayingText = v;              // <-- remember it
+                nowPlayingEl.textContent = v;
+              }
+            }
+          } catch (_) {}
+        });
+      });
+
+      hlsInstance.on(Hls.Events.ERROR, (event, data) => {
+        console.warn("[RADIO] HLS error:", data && data.details);
+      });
+    } else {
+      audioEl.src = station.streamUrl;
+      if (autoplay) playAudio();
+    }
+  }
+
+  function togglePlayPause() {
+    const station = getCurrentStation();
+    if (!station) return;
+
+    // First press: start current station
+    if (!audioEl.src && !hlsInstance) {
+      attachStream(station, true);
+      return;
+    }
+
+    if (isPlaying) {
+      audioEl.pause();
+      isPlaying = false;
+      syncPlayingUI();
+    } else {
+      playAudio();
+    }
+  }
+
+  function stopPlayback() {
+    const station = getCurrentStation();
+    audioEl.pause();
+    audioEl.currentTime = 0;
+    isPlaying = false;
+    syncPlayingUI();
+
+    // show "(stopped)" but DO NOT wipe lastNowPlayingText
+    if (station) {
+      nowPlayingEl.textContent = `${station.name} (stopped)`;
+    } else {
+      nowPlayingEl.textContent = "Playback stopped";
+    }
+  }
+
+  function setVolumeFromSlider() {
+    const value = Number(volumeSlider.value) || 0;
+    audioEl.volume = Math.min(Math.max(value / 100, 0), 1);
+  }
+// === Persist Radio Volume ===
+
+// Load previously saved volume (default 0.75)
+const savedRadioVol = MC.get("radioVol", 0.75);
+volumeSlider.value = savedRadioVol * 100;
+audioEl.volume = savedRadioVol;
+
+// Whenever the slider moves, save the new volume
+volumeSlider.addEventListener("input", () => {
+  const vol = Number(volumeSlider.value) / 100;
+  MC.set("radioVol", vol);
+});
+
+  // --- Events ---
+
+  stationButtons.forEach(btn => {
+  btn.addEventListener("click", () => {
+    const id = btn.dataset.station;
+    if (!id || !RADIO_STATIONS[id]) return;
+
+    currentStationId = id;
+
+    // Persist last-used station
+    try {
+      if (typeof MC !== "undefined" && MC.set) {
+        MC.set("radioStation", id);
+      }
+    } catch (e) {
+      console.warn("[RADIO] Failed to save station:", e);
+    }
+
+    setActiveStationButton(id);
+    const station = getCurrentStation();
+    attachStream(station, true);
+  });
+});
+
+
+  playPauseBtn.addEventListener("click", togglePlayPause);
+  stopBtn.addEventListener("click", stopPlayback);
+
+  volumeSlider.addEventListener("input", setVolumeFromSlider);
+
+  audioEl.addEventListener("play", () => {
+    isPlaying = true;
+    syncPlayingUI();
+  });
+  audioEl.addEventListener("pause", () => {
+    isPlaying = false;
+    syncPlayingUI();
+  });
+
+  // --- Initial state ---
+  setActiveStationButton(currentStationId);
+  nowPlayingEl.textContent = `${RADIO_STATIONS[currentStationId].name} — ready`;
+  setVolumeFromSlider();
+  updatePlayPauseIcon();
+})();
+</script>
+
+
+<script>
+(function () {
+  const STORAGE_KEY = 'feed.blocklist';
+
+  function readBlocklist() {
+    try {
+      if (typeof MC === 'undefined' || typeof MC.get !== 'function') return [];
+      const value = MC.get(STORAGE_KEY, []);
+      if (Array.isArray(value)) return value;
+      if (typeof value === 'string' && value.trim()) {
+        return value.split(',').map(s => s.trim()).filter(Boolean);
+      }
+      return [];
+    } catch (e) {
+      console.warn('[MissionFeedFilter] readBlocklist failed', e);
+      return [];
+    }
+  }
+
+  function writeBlocklist(list) {
+    try {
+      if (typeof MC === 'undefined' || typeof MC.set !== 'function') return;
+      const cleaned = Array.from(
+        new Set(
+          list
+            .map(x => (x || '').trim())
+            .filter(Boolean)
+            .map(x => x.toLowerCase())
+        )
+      );
+      MC.set(STORAGE_KEY, cleaned);
+    } catch (e) {
+      console.warn('[MissionFeedFilter] writeBlocklist failed', e);
+    }
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/[&<>"]/g, c => (
+      { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c] || c
+    ));
+  }
+
+  function renderChips(container, items) {
+    if (!container) return;
+    if (!items.length) {
+      container.innerHTML =
+        '<div class="feed-filter-empty">No filters active.</div>';
+      return;
+    }
+
+    container.innerHTML = items.map((v, idx) => `
+      <button type="button" class="feed-filter-chip" data-index="${idx}">
+        <span>${escapeHtml(v)}</span>
+        <span class="feed-filter-chip-x">✕</span>
+      </button>
+    `).join('');
+  }
+
+  function reloadFeed() {
+    const refreshBtn = document.getElementById('missionFeedRefresh');
+    if (refreshBtn) refreshBtn.click();
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const panel  = document.getElementById('feedBlockPanel');
+    const toggle = document.getElementById('missionFeedFilter');
+    const listEl = document.getElementById('feedBlockList');
+    const input  = document.getElementById('feedBlockInput');
+    const addBtn = document.getElementById('feedBlockAdd');
+    const clrBtn = document.getElementById('feedBlockClear');
+
+    if (!panel || !toggle || !listEl || !input || !addBtn || !clrBtn) return;
+
+    let current = readBlocklist();
+    renderChips(listEl, current);
+	  // If there are existing filters, show the panel + mark button active on load
+  if (current.length) {
+    panel.removeAttribute('hidden');
+    toggle.classList.add('active');
+  }
+
+	// NEW: force feed to reload once on startup so filters apply immediately
+  reloadFeed();
+
+    // Toggle drawer
+    toggle.addEventListener('click', () => {
+      const isOpen = !panel.hasAttribute('hidden');
+      if (isOpen) {
+        panel.setAttribute('hidden', '');
+        toggle.classList.remove('active');
+      } else {
+        panel.removeAttribute('hidden');
+        toggle.classList.add('active');
+        input.focus();
+      }
+    });
+
+    function addFromInput() {
+      const raw = (input.value || '').trim();
+      if (!raw) return;
+
+      const parts = raw.split(',').map(s => s.trim()).filter(Boolean);
+      let changed = false;
+
+      parts.forEach(p => {
+        const lower = p.toLowerCase();
+        if (!current.some(x => x.toLowerCase() === lower)) {
+          current.push(p);
+          changed = true;
+        }
+      });
+
+      if (!changed) {
+        input.value = '';
+        return;
+      }
+
+      writeBlocklist(current);
+      renderChips(listEl, current);
+      input.value = '';
+   
+    clrBtn.addEventListener('click', () => {
+      if (!current.length) return;
+      current = [];
+      writeBlocklist(current);
+      renderChips(listEl, current);
+      reloadFeed();
+    });
+
+    listEl.addEventListener('click', (evt) => {
+      const chip = evt.target.closest('.feed-filter-chip');
+      if (!chip) return;
+      const idx = Number(chip.dataset.index);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= current.length) return;
+
+      current.splice(idx, 1);
+      writeBlocklist(current);
+      renderChips(listEl, current);
+      reloadFeed();
+    });
+  });
+})();
+</script>
+
+<script>
+// === Mission Control title pulse helper (minute-synced) ===================
+(function () {
+  const TITLE_SELECTOR = '.mc-banner';
+
+  function pulseMissionTitle() {
+    const pill = document.querySelector(TITLE_SELECTOR);
+    if (!pill) return;
+
+    pill.classList.remove('mc-title-pulse');
+    void pill.offsetWidth;
+    pill.classList.add('mc-title-pulse');
+  }
+
+  window.pulseMissionTitle = pulseMissionTitle;
+
+  // --- Sync pulse exactly on :00 each minute ---
+    function scheduleMinuteSync() {
+    const now = new Date();
+    const ms = now.getMilliseconds();
+    const sec = now.getSeconds();
+
+    // Time until next top-of-minute (raw)
+    let msToNextMinute = (60 - sec) * 1000 - ms;
+
+    // --- Critical fix: overshoot slightly ---
+    // Ensures we don't fire early at :59.9
+    msToNextMinute += 400;  // 120ms bump for timing accuracy
+
+    setTimeout(() => {
+      pulseMissionTitle();
+
+      // From here, sync stays perfect
+      setInterval(pulseMissionTitle, 60_000);
+
+    }, msToNextMinute);
+  }
+
+
+  // Start synced countdown
+  scheduleMinuteSync();
+})();
+
+</script>
+
+<script>
+/* === DATA STREAM STATUS HANDLER =================================== */
+(function () {
+  const el = document.getElementById('dataStatus');
+  if (!el) return;
+
+  const stateSpan = el.querySelector('.state');
+
+  window.setDataStatus = function(mode){
+    el.classList.remove(
+      'data-pill-live',
+      'data-pill-cached',
+      'data-pill-stale',
+      'data-pill-offline'
+    );
+
+    let label = 'BOOT';
+
+    switch(mode){
+      case 'live':
+        el.classList.add('data-pill-live');
+        label = 'LIVE';
+        break;
+
+      case 'cached':
+        el.classList.add('data-pill-cached');
+        label = 'CACHED';
+        break;
+
+      case 'stale':
+        el.classList.add('data-pill-stale');
+        label = 'STALE';
+        break;
+
+      case 'offline':
+        el.classList.add('data-pill-offline');
+        label = 'OFFLINE';
+        break;
+    }
+
+    stateSpan.textContent = label;
+  };
+
+})();
+</script>
+
+
+
+</body>
+</html>
